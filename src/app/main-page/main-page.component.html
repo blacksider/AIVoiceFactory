@@ -1,0 +1,19 @@
+<div class="main-body h-100">
+  <nz-tabset nzLinkRouter>
+    <nz-tab>
+      <a *nzTabLink nz-tab-link [routerLink]="['.']">主窗口</a>
+    </nz-tab>
+    <nz-tab>
+      <a *nzTabLink nz-tab-link [routerLink]="['.', 'voice-engine']">AI语音引擎</a>
+    </nz-tab>
+    <nz-tab>
+      <a *nzTabLink nz-tab-link [routerLink]="['.', 'auto-translate']">自动翻译</a>
+    </nz-tab>
+    <nz-tab>
+      <a *nzTabLink nz-tab-link [routerLink]="['.', 'settings']">设置</a>
+    </nz-tab>
+  </nz-tabset>
+  <div class="main-content">
+    <router-outlet></router-outlet>
+  </div>
+</div>

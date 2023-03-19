@@ -1,0 +1,48 @@
+<!--<div class="container">
+  <h1>Welcome to Tauri + Angular!</h1>
+  <div class="row">
+    <a href="https://tauri.app" target="_blank">
+      <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo"/>
+    </a>
+    <a href="https://angular.io" target="_blank">
+      <img src="/assets/angular.svg" class="logo angular" alt="Angular logo"/>
+    </a>
+  </div>
+  <p>Click on the logos to learn more about the frameworks</p>
+  <div class="row">
+    <form (submit)="greet($event, greetInput.value)">
+      <input #greetInput id="greet-input" placeholder="Enter a name..."/>
+      <button type="submit">Greet</button>
+    </form>
+  </div>
+  <p>{{ greetingMessage }}</p>
+</div>-->
+
+<div nz-row nzGutter="10" class="h-100">
+  <div nz-col nzXs="24" nzSm="12" nzMd="12" nzLg="6" nzXl="6"
+       class="main-border">
+    <nz-layout class="h-100">
+      <nz-content>
+        <nz-card [nzBordered]="false" nzTitle="用户输入" nzSize="small"
+                 class="main-card"
+                 [nzBodyStyle]="{flex: '1 1 auto', padding: '10px 0 0'}">
+          <textarea nz-input
+                    [(ngModel)]="inputMessage"
+                    class="h-100 no-resize">
+          </textarea>
+        </nz-card>
+      </nz-content>
+      <nz-footer>
+        <div nz-row nzJustify="end">
+          <button nz-button nzType="primary">生成语音</button>
+        </div>
+      </nz-footer>
+    </nz-layout>
+  </div>
+  <div nz-col nzXs="24" nzSm="12" nzMd="12" nzLg="18" nzXl="18">
+    <nz-card [nzBordered]="false" nzTitle="监控" nzSize="small"
+             class="main-card"
+             [nzBodyStyle]="{flex: '1 1 auto'}">
+    </nz-card>
+  </div>
+</div>
