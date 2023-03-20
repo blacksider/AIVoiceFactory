@@ -4,7 +4,9 @@ import {MainPageComponent} from './main-page/main-page.component';
 import {WindowComponent} from './window/window.component';
 import {VoiceEngineComponent} from './voice-engine/voice-engine.component';
 import {AutoTranslationComponent} from './auto-translation/auto-translation.component';
-import {SettingsComponent} from './settings/settings.component'; // CLI imports router
+import {SettingsComponent} from './settings/settings.component';
+import {voiceEngineConfigResolver} from './voice-engine/voice-engine.service';
+import {autoTranslationConfigResolver} from './auto-translation/auto-translation.service';
 
 const routes: Routes = [
   {
@@ -12,8 +14,20 @@ const routes: Routes = [
     component: MainPageComponent,
     children: [
       {path: '', component: WindowComponent},
-      {path: 'voice-engine', component: VoiceEngineComponent},
-      {path: 'auto-translate', component: AutoTranslationComponent},
+      {
+        path: 'voice-engine',
+        component: VoiceEngineComponent,
+        resolve: {
+          config: voiceEngineConfigResolver
+        }
+      },
+      {
+        path: 'auto-translate',
+        component: AutoTranslationComponent,
+        resolve: {
+          config: autoTranslationConfigResolver
+        }
+      },
       {path: 'settings', component: SettingsComponent}
     ]
   }

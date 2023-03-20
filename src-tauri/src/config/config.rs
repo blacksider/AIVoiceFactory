@@ -1,16 +1,20 @@
+use std::{fmt, fs};
 use std::env::current_dir;
 use std::error::Error;
-use std::fmt;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 #[cfg(not(target_os = "windows"))]
 use tauri::api::path::home_dir;
+
+use crate::cypher;
+
+static CONFIG_CIPHER_KEY: &str = "aivoice_factory20230319@macarron";
+pub static CONFIG_FOLDER: &str = "configs";
 
 pub fn get_app_home_dir() -> PathBuf {
     // on windows, set to current app path
@@ -80,6 +84,9 @@ fn write_file(file_path: &str, content: &str) -> std::io::Result<()> {
 pub fn save_config<T: Serialize>(config_file: &str, data: &T) -> Result<(), ConfigError> {
     let data_json = serde_json::to_string(data)
         .map_err(ConfigError::from)?;
+    let data_json = cypher::encrypt::encrypt(
+        CONFIG_CIPHER_KEY,
+        data_json.as_ref());
     write_file(config_file, data_json.as_str())
         .map_err(ConfigError::from)
 }
@@ -88,8 +95,19 @@ pub fn load_config<'a, T>(config_file: &'a str) -> Result<T, ConfigError>
     where T: 'a + DeserializeOwned {
     let data_json = read_file(config_file)
         .map_err(ConfigError::from)?;
+    let data_json = cypher::encrypt::decrypt(
+        CONFIG_CIPHER_KEY,
+        data_json.as_ref(),
+    );
     let result: T = serde_json::from_str(data_json.as_str()).map_err(ConfigError::from)?;
     Ok(result)
+}
+
+pub fn init() {
+    let config_path = get_app_home_dir().join(CONFIG_FOLDER);
+    if !config_path.exists() {
+        fs::create_dir_all(config_path).unwrap();
+    }
 }
 
 #[cfg(test)]

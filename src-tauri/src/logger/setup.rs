@@ -26,7 +26,7 @@ pub fn setup_logger() {
     let logfile_log_level = LevelFilter::Info;
 
     // define log pattern
-    let log_pattern = "{d(%Y-%m-%d %H:%M:%S)} | {({l}):5.5} | {m}{n}";
+    let log_pattern = "{d(%Y-%m-%d %H:%M:%S)} | {({l}):5.5} | {f}:{L} — {m}{n}";
 
     // define single log file size to 10MB
     let trigger_size = byte_unit::n_mb_bytes!(10) as u64;

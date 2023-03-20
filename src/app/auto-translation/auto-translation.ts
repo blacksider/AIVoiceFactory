@@ -17,7 +17,7 @@ export class Translator {
   }
 }
 
-export const TranslatorTypes: {[key: string]: Translator} = {
+export const TranslatorTypes: { [key: string]: Translator } = {
   Baidu: new Translator("Baidu", "百度通用翻译")
 };
 

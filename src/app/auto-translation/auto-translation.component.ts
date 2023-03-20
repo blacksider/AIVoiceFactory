@@ -1,5 +1,6 @@
 import {Component, OnInit} from '@angular/core';
 import {AutoTranslationConfig, BaiduLanguages, TranslateByBaidu, Translator, TranslatorTypes} from './auto-translation';
+import {ActivatedRoute} from '@angular/router';
 
 @Component({
   selector: 'app-auto-translation',
@@ -18,7 +19,17 @@ export class AutoTranslationComponent implements OnInit {
 
   translateByBaidu?: TranslateByBaidu;
 
+  constructor(private activatedRoute: ActivatedRoute) {
+  }
+
   ngOnInit(): void {
+    this.activatedRoute.data.subscribe(
+      ({config}) => {
+        this.config = config as AutoTranslationConfig;
+        if (this.config.tool.type === TranslatorTypes['Baidu'].type) {
+          this.translateByBaidu = this.config.tool as TranslateByBaidu;
+        }
+      });
     BaiduLanguages.forEach((value, index) => {
       if (index > 0) {
         this.baiduToLanguageTypes.push(value.key);
@@ -26,13 +37,5 @@ export class AutoTranslationComponent implements OnInit {
       this.baiduFromLanguageTypes.push(value.key);
       this.baiduLanguages[value.key] = value.name;
     });
-
-    // init translation config
-    this.config = new AutoTranslationConfig();
-    this.config.enable = true;
-    this.translateByBaidu = new TranslateByBaidu();
-    this.translateByBaidu.from = this.baiduFromLanguageTypes[0];
-    this.translateByBaidu.to = 'jp';
-    this.config.tool = this.translateByBaidu;
   }
 }

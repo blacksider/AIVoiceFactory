@@ -1,20 +1,18 @@
-#![allow(unused)]
-
 use aes::Aes256;
 use base64::{Engine as _, engine::general_purpose};
 use block_modes::{BlockMode, Cbc};
 use block_modes::block_padding::Pkcs7;
 use rand::seq::SliceRandom;
 
-static KEY: &str = "aivoice_factory20230319@macarron";
-
 type AesCBC = Cbc<Aes256, Pkcs7>;
+
+const BASE_STR: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 /// generate random bytes iv for encoding
 fn generate_random_iv(size: usize) -> String {
     let mut rng = &mut rand::thread_rng();
     String::from_utf8(
-        KEY.as_bytes()
+        BASE_STR.as_bytes()
             .choose_multiple(&mut rng, size)
             .cloned()
             .collect()
@@ -22,7 +20,7 @@ fn generate_random_iv(size: usize) -> String {
 }
 
 /// encrypt data by key, return a base64 encoded string
-fn encrypt(key: &str, data: &str) -> String {
+pub fn encrypt(key: &str, data: &str) -> String {
     let iv_str = generate_random_iv(16);
     let iv = iv_str.as_bytes();
     let cipher = AesCBC::new_from_slices(key.as_bytes(), iv).unwrap();
@@ -33,7 +31,7 @@ fn encrypt(key: &str, data: &str) -> String {
 }
 
 /// decrypt data by key, data should be a base64 encoded string, return decrypted string
-fn decrypt(key: &str, data: &str) -> String {
+pub fn decrypt(key: &str, data: &str) -> String {
     let bytes = general_purpose::STANDARD
         .decode(data).unwrap();
     let cipher = AesCBC::new_from_slices(key.as_bytes(), &bytes[0..16]).unwrap();
@@ -46,7 +44,8 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt() {
-        let encrypted = encrypt(KEY, "some text");
-        assert_eq!(decrypt(KEY, &encrypted), "some text");
+        let key = "01234567012345670123456701234567";
+        let encrypted = encrypt(key, "some text");
+        assert_eq!(decrypt(key, &encrypted), "some text");
     }
 }

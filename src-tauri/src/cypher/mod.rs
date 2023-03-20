@@ -1,1 +1,1 @@
-mod encrypt;
+pub mod encrypt;

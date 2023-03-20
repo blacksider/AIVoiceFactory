@@ -3,7 +3,7 @@
     <nz-form-label [nzSpan]="24" nzFor="selectEngine">引擎类型</nz-form-label>
     <nz-form-control nzMd="6" nzSm="12" nzXs="24">
       <nz-select id="selectEngine" name="selectEngine"
-                 [(ngModel)]="selectedEngine">
+                 [(ngModel)]="voiceEngineConfig.type">
         <nz-option *ngFor="let type of engineTypeValues"
                    [nzValue]="type"
                    [nzLabel]="type">
@@ -12,8 +12,8 @@
     </nz-form-control>
   </nz-form-item>
   <nz-divider nzType="horizontal"></nz-divider>
-  <div *ngIf="selectedEngine === engineTypes.VoiceVox">
-    <h4>{{selectedEngine}} 配置</h4>
+  <div *ngIf="voiceEngineConfig.type === engineTypes.VoiceVox">
+    <h4>{{voiceEngineConfig.type}} 配置</h4>
     <nz-form-item>
       <nz-form-label [nzSpan]="24" nzFor="address">API地址</nz-form-label>
       <nz-form-control nzMd="12" nzXs="24">

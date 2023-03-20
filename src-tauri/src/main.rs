@@ -6,6 +6,7 @@ use tauri::{AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, Sys
 mod logger;
 mod cypher;
 mod config;
+mod commands;
 
 fn create_system_tray() -> SystemTray {
     let quit = CustomMenuItem::new("exit".to_string(), "Exit");
@@ -43,13 +44,6 @@ pub fn handle_system_tray_event(app: &AppHandle<Wry>, event: SystemTrayEvent) {
     }
 }
 
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-#[tauri::command]
-fn greet(name: &str) -> String {
-    log::info!("Accept name: {}", name);
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 fn main() {
     logger::setup::setup_logger();
 
@@ -58,6 +52,11 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             log::info!("Application started");
+
+            // config check init
+            config::config::init();
+
+            // setup window location to the right side of the screent
             let window: Window<Wry> = app.get_window("main").ok_or("Main window not found")?;
             let window_width = window.outer_size()?.width;
             let screen = window.current_monitor()?.ok_or("Monitor info not found")?;
@@ -67,7 +66,12 @@ fn main() {
             window.set_position(tauri::PhysicalPosition { x: window_x, y: window_y })?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            commands::mapping::cmd::get_voice_engine_config,
+            commands::mapping::cmd::save_voice_engine_config,
+            commands::mapping::cmd::get_auto_translation_config,
+            commands::mapping::cmd::save_auto_translation_config,
+        ])
         .system_tray(create_system_tray())
         .on_system_tray_event(handle_system_tray_event)
         .run(tauri::generate_context!())
