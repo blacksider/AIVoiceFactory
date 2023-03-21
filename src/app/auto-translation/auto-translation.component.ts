@@ -1,6 +1,9 @@
 import {Component, OnInit} from '@angular/core';
 import {AutoTranslationConfig, BaiduLanguages, TranslateByBaidu, Translator, TranslatorTypes} from './auto-translation';
 import {ActivatedRoute} from '@angular/router';
+import {AutoTranslationService} from './auto-translation.service';
+import {FormBuilder, FormControl, FormGroup} from '@angular/forms';
+import {debounceTime, filter} from 'rxjs';
 
 @Component({
   selector: 'app-auto-translation',
@@ -8,8 +11,6 @@ import {ActivatedRoute} from '@angular/router';
   styleUrls: ['./auto-translation.component.less']
 })
 export class AutoTranslationComponent implements OnInit {
-  config!: AutoTranslationConfig;
-
   translatorTypes: { [key: string]: Translator } = TranslatorTypes;
   translators = Object.keys(TranslatorTypes);
 
@@ -17,18 +18,44 @@ export class AutoTranslationComponent implements OnInit {
   baiduToLanguageTypes: string[] = [];
   baiduLanguages: { [key: string]: string } = {};
 
-  translateByBaidu?: TranslateByBaidu;
+  configForm!: FormGroup;
 
-  constructor(private activatedRoute: ActivatedRoute) {
+  constructor(private activatedRoute: ActivatedRoute,
+              private service: AutoTranslationService,
+              private fb: FormBuilder) {
   }
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(
       ({config}) => {
-        this.config = config as AutoTranslationConfig;
-        if (this.config.tool.type === TranslatorTypes['Baidu'].type) {
-          this.translateByBaidu = this.config.tool as TranslateByBaidu;
+        const configData = config as AutoTranslationConfig;
+
+        this.configForm = this.fb.group({
+          enable: [configData.enable]
+        });
+
+        if (configData.tool.type === TranslatorTypes['Baidu'].type) {
+          const translateByBaidu = configData.tool as TranslateByBaidu;
+          this.configForm.addControl('tool', this.fb.group({
+            type: [translateByBaidu.type],
+            apiAddr: [translateByBaidu.apiAddr],
+            appId: [translateByBaidu.appId],
+            secret: [translateByBaidu.secret],
+            from: [translateByBaidu.from],
+            to: [translateByBaidu.to]
+          }));
         }
+
+        this.configForm.valueChanges
+          .pipe(
+            filter(() => this.configForm.valid),
+            debounceTime(500),
+          )
+          .subscribe(value => {
+            console.log('changed');
+            this.service.saveAutoTranslationConfig(value).subscribe(() => {
+            });
+          });
       });
     BaiduLanguages.forEach((value, index) => {
       if (index > 0) {
@@ -37,5 +64,13 @@ export class AutoTranslationComponent implements OnInit {
       this.baiduFromLanguageTypes.push(value.key);
       this.baiduLanguages[value.key] = value.name;
     });
+  }
+
+  get enable(): FormControl {
+    return this.configForm.get('enable') as FormControl;
+  }
+
+  get type(): FormControl {
+    return this.configForm.get('tool')?.get('type') as FormControl;
   }
 }

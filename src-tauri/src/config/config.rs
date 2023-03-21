@@ -1,43 +1,15 @@
-use std::{fmt, fs};
-use std::env::current_dir;
+use std::{fmt};
 use std::error::Error;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::PathBuf;
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-#[cfg(not(target_os = "windows"))]
-use tauri::api::path::home_dir;
 
-use crate::cypher;
+use crate::{cypher};
 
 static CONFIG_CIPHER_KEY: &str = "aivoice_factory20230319@macarron";
-pub static CONFIG_FOLDER: &str = "configs";
-
-pub fn get_app_home_dir() -> PathBuf {
-    // on windows, set to current app path
-    #[cfg(target_os = "windows")]
-    if let Err(e) = current_dir() {
-        log::error!("Failed to get app home dir. error: {}", e);
-        std::process::exit(-1);
-    } else {
-        return current_dir().unwrap();
-    }
-    // if not on windows, set to use app data path
-    #[cfg(not(target_os = "windows"))]
-    match home_dir() {
-        None => {
-            error!("Failed to get app home dir");
-            std::process::exit(-1);
-        }
-        Some(path) => {
-            // APP_DIR is tauri platform app data path
-            return path.join(APP_DIR);
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct ConfigError {
@@ -101,13 +73,6 @@ pub fn load_config<'a, T>(config_file: &'a str) -> Result<T, ConfigError>
     );
     let result: T = serde_json::from_str(data_json.as_str()).map_err(ConfigError::from)?;
     Ok(result)
-}
-
-pub fn init() {
-    let config_path = get_app_home_dir().join(CONFIG_FOLDER);
-    if !config_path.exists() {
-        fs::create_dir_all(config_path).unwrap();
-    }
 }
 
 #[cfg(test)]

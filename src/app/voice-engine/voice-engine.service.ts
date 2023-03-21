@@ -15,6 +15,10 @@ export class VoiceEngineService {
   getVoiceEngineConfig(): Observable<VoiceEngineConfig> {
     return fromPromise<VoiceEngineConfig>(invoke<VoiceEngineConfig>('get_voice_engine_config'));
   }
+
+  saveVoiceEngineConfig(config: VoiceEngineConfig): Observable<boolean> {
+    return fromPromise<boolean>(invoke<boolean>('save_voice_engine_config', {config}));
+  }
 }
 
 export const voiceEngineConfigResolver: ResolveFn<VoiceEngineConfig> =

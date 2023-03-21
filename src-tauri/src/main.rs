@@ -7,6 +7,8 @@ mod logger;
 mod cypher;
 mod config;
 mod commands;
+mod controller;
+mod utils;
 
 fn create_system_tray() -> SystemTray {
     let quit = CustomMenuItem::new("exit".to_string(), "Exit");
@@ -52,10 +54,6 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             log::info!("Application started");
-
-            // config check init
-            config::config::init();
-
             // setup window location to the right side of the screent
             let window: Window<Wry> = app.get_window("main").ok_or("Main window not found")?;
             let window_width = window.outer_size()?.width;
@@ -71,6 +69,9 @@ fn main() {
             commands::mapping::cmd::save_voice_engine_config,
             commands::mapping::cmd::get_auto_translation_config,
             commands::mapping::cmd::save_auto_translation_config,
+            commands::mapping::cmd::list_audios,
+            commands::mapping::cmd::generate_audio,
+            commands::mapping::cmd::check_audio_caches,
         ])
         .system_tray(create_system_tray())
         .on_system_tray_event(handle_system_tray_event)

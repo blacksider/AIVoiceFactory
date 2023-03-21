@@ -15,6 +15,10 @@ export class AutoTranslationService {
   getAutoTranslationConfig(): Observable<AutoTranslationConfig> {
     return fromPromise<AutoTranslationConfig>(invoke<AutoTranslationConfig>('get_auto_translation_config'));
   }
+
+  saveAutoTranslationConfig(config: AutoTranslationConfig): Observable<boolean> {
+    return fromPromise<boolean>(invoke<boolean>('save_auto_translation_config', {config}));
+  }
 }
 
 export const autoTranslationConfigResolver: ResolveFn<AutoTranslationConfig> =

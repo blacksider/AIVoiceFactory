@@ -1,9 +1,9 @@
-<form nz-form>
+<form nz-form [formGroup]="voiceEngineConfigForm">
   <nz-form-item>
     <nz-form-label [nzSpan]="24" nzFor="selectEngine">引擎类型</nz-form-label>
     <nz-form-control nzMd="6" nzSm="12" nzXs="24">
       <nz-select id="selectEngine" name="selectEngine"
-                 [(ngModel)]="voiceEngineConfig.type">
+                 formControlName="type">
         <nz-option *ngFor="let type of engineTypeValues"
                    [nzValue]="type"
                    [nzLabel]="type">
@@ -12,22 +12,24 @@
     </nz-form-control>
   </nz-form-item>
   <nz-divider nzType="horizontal"></nz-divider>
-  <div *ngIf="voiceEngineConfig.type === engineTypes.VoiceVox">
-    <h4>{{voiceEngineConfig.type}} 配置</h4>
-    <nz-form-item>
-      <nz-form-label [nzSpan]="24" nzFor="address">API地址</nz-form-label>
-      <nz-form-control nzMd="12" nzXs="24">
-        <nz-input-group [nzAddOnBefore]="protocolTemplate">
-          <ng-template #protocolTemplate>
-            <nz-select id="protocol" name="protocol" [ngModel]="voiceVoxEngineConfig.protocol"
-                       class="protocol-select">
-              <nz-option nzLabel="http://" nzValue="http"></nz-option>
-              <nz-option nzLabel="https://" nzValue="https"></nz-option>
-            </nz-select>
-          </ng-template>
-          <input id="address" name="address" nz-input [ngModel]="voiceVoxEngineConfig.apiAddr"/>
-        </nz-input-group>
-      </nz-form-control>
-    </nz-form-item>
-  </div>
+  <ng-container formGroupName="config">
+    <div *ngIf="type.value === engineTypes.VoiceVox" formGroupName="config">
+      <h4>{{type.value}} 配置</h4>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzFor="address">API地址</nz-form-label>
+        <nz-form-control nzMd="12" nzXs="24">
+          <nz-input-group [nzAddOnBefore]="protocolTemplate">
+            <ng-template #protocolTemplate>
+              <nz-select id="protocol" name="protocol" formControlName="protocol"
+                         class="protocol-select">
+                <nz-option nzLabel="http://" nzValue="http"></nz-option>
+                <nz-option nzLabel="https://" nzValue="https"></nz-option>
+              </nz-select>
+            </ng-template>
+            <input id="address" name="address" nz-input formControlName="apiAddr"/>
+          </nz-input-group>
+        </nz-form-control>
+      </nz-form-item>
+    </div>
+  </ng-container>
 </form>

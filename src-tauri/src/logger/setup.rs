@@ -17,7 +17,7 @@ use log4rs::{
 };
 use log::LevelFilter;
 
-use crate::config::config;
+use crate::utils;
 
 pub fn setup_logger() {
     // define log levels
@@ -48,7 +48,7 @@ pub fn setup_logger() {
                                                        Box::new(roller));
 
     // define rolling file appender
-    let log_path = config::get_app_home_dir().join("logs").join("ai_voice_factory.log");
+    let log_path = utils::get_app_home_dir().join("logs").join("ai_voice_factory.log");
     let log_file = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(log_pattern)))
         .build(log_path, Box::new(log_file_compound_policy))

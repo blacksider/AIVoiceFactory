@@ -1,49 +1,52 @@
-<form nz-form>
+<form nz-form [formGroup]="configForm">
   <nz-form-item nz-row class="register-area">
     <nz-form-control [nzSpan]="24">
-      <label nz-checkbox id="enable" name="enable" [(ngModel)]="config.enable">
+      <label nz-checkbox id="enable" name="enable" formControlName="enable">
         <span>启用</span>
       </label>
     </nz-form-control>
   </nz-form-item>
-  <ng-container *ngIf="config.enable">
+  <ng-container *ngIf="enable.value === true" formGroupName="tool">
     <nz-form-item>
       <nz-form-label [nzSpan]="24" nzFor="type">翻译器</nz-form-label>
       <nz-form-control nzMd="6" nzSm="12" nzXs="24">
         <nz-select id="type" name="type"
-                   [(ngModel)]="config.tool.type">
+                   formControlName="type">
           <nz-option *ngFor="let type of translators"
                      [nzValue]="type"
                      [nzLabel]="translatorTypes[type].name"></nz-option>
         </nz-select>
       </nz-form-control>
     </nz-form-item>
-    <div *ngIf="config.tool.type === translatorTypes['Baidu'].type">
+    <div *ngIf="type.value === translatorTypes['Baidu'].type">
       <nz-divider nzType="horizontal"></nz-divider>
       <h4>百度通用翻译配置</h4>
       <nz-form-item>
         <nz-form-label [nzSpan]="24" nzFor="apiAddr">地址</nz-form-label>
         <nz-form-control nzMd="12" nzXs="24">
-          <input id="apiAddr" name="apiAddr" nz-input [ngModel]="translateByBaidu!.apiAddr"/>
+          <input id="apiAddr" name="apiAddr" nz-input
+                 formControlName="apiAddr"/>
         </nz-form-control>
       </nz-form-item>
       <nz-form-item>
         <nz-form-label [nzSpan]="24" nzFor="appId">APP ID</nz-form-label>
         <nz-form-control nzMd="12" nzXs="24">
-          <input id="appId" name="appId" nz-input [ngModel]="translateByBaidu!.appId"/>
+          <input id="appId" name="appId" nz-input
+                 formControlName="appId"/>
         </nz-form-control>
       </nz-form-item>
       <nz-form-item>
         <nz-form-label [nzSpan]="24" nzFor="secret">密钥</nz-form-label>
         <nz-form-control nzMd="12" nzXs="24">
-          <input type="password" id="secret" name="secret" nz-input [ngModel]="translateByBaidu!.secret"/>
+          <input type="password" id="secret" name="secret" nz-input
+                 formControlName="secret"/>
         </nz-form-control>
       </nz-form-item>
       <nz-form-item>
         <nz-form-label [nzSpan]="24" nzFor="from">源语言</nz-form-label>
         <nz-form-control nzMd="6" nzSm="12" nzXs="24">
           <nz-select id="from" name="from"
-                     [(ngModel)]="translateByBaidu!.from">
+                     formControlName="from">
             <nz-option *ngFor="let from of baiduFromLanguageTypes"
                        [nzValue]="from"
                        [nzLabel]="baiduLanguages[from]"></nz-option>
@@ -54,7 +57,7 @@
         <nz-form-label [nzSpan]="24" nzFor="from">目标语言</nz-form-label>
         <nz-form-control nzMd="6" nzSm="12" nzXs="24">
           <nz-select id="to" name="to"
-                     [(ngModel)]="translateByBaidu!.to">
+                     formControlName="to">
             <nz-option *ngFor="let to of baiduToLanguageTypes"
                        [nzValue]="to"
                        [nzLabel]="baiduLanguages[to]"></nz-option>

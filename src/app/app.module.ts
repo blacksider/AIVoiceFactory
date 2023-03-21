@@ -14,7 +14,7 @@ import {VoiceEngineComponent} from './voice-engine/voice-engine.component';
 import {AutoTranslationComponent} from './auto-translation/auto-translation.component';
 import {NzSpaceModule} from 'ng-zorro-antd/space';
 import {NzGridModule} from 'ng-zorro-antd/grid';
-import {FormsModule} from '@angular/forms';
+import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {NzInputModule} from 'ng-zorro-antd/input';
 import {NzCardModule} from 'ng-zorro-antd/card';
 import {NzButtonModule} from 'ng-zorro-antd/button';
@@ -25,14 +25,24 @@ import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
 import {NzFormModule} from 'ng-zorro-antd/form';
 import {NzDividerModule} from 'ng-zorro-antd/divider';
 import {NzCheckboxModule} from 'ng-zorro-antd/checkbox';
+import {NzNotificationModule} from 'ng-zorro-antd/notification';
+import {NzListModule} from 'ng-zorro-antd/list';
 
 registerLocaleData(en);
 
 @NgModule({
-  declarations: [AppComponent, MainPageComponent, WindowComponent, VoiceEngineComponent, AutoTranslationComponent, SettingsComponent],
+  declarations: [
+    AppComponent,
+    MainPageComponent,
+    WindowComponent,
+    VoiceEngineComponent,
+    AutoTranslationComponent,
+    SettingsComponent
+  ],
   imports: [
     BrowserModule,
     BrowserAnimationsModule,
+    ReactiveFormsModule,
     AppRoutingModule,
     NzTabsModule,
     NzSpaceModule,
@@ -45,7 +55,9 @@ registerLocaleData(en);
     NzSelectModule,
     NzFormModule,
     NzDividerModule,
-    NzCheckboxModule
+    NzCheckboxModule,
+    NzNotificationModule,
+    NzListModule
   ],
   providers: [
     {provide: NZ_I18N, useValue: en_US},
