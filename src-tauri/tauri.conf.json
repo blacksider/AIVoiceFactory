@@ -3,11 +3,11 @@
     "beforeDevCommand": "pnpm start --port 1420",
     "beforeBuildCommand": "pnpm build",
     "devPath": "http://localhost:1420",
-    "distDir": "../dist/ai_voice_factory",
+    "distDir": "../dist/AIVoiceFactory",
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "ai_voice_factory",
+    "productName": "AI Voice Factory",
     "version": "0.0.0"
   },
   "tauri": {
@@ -27,8 +27,18 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauri.dev",
-      "targets": "all"
+      "identifier": "com.macarron.aivoicefactory",
+      "targets": "all",
+      "windows": {
+        "digestAlgorithm": "sha256",
+        "webviewInstallMode": {
+          "silent": true,
+          "type": "embedBootstrapper"
+        },
+        "wix": {
+          "language": "zh-CN"
+        }
+      }
     },
     "security": {
       "csp": null

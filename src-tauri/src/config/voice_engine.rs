@@ -1,13 +1,11 @@
-use std::path::PathBuf;
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
 
 use crate::config::config;
 use crate::config::config::ConfigError;
-use crate::utils;
 
-static VOICE_ENGINE_CONFIG_FILE: &str = "voice_engine.cfg";
+static VOICE_ENGINE_CONFIG: &str = "voice_engine";
 
 lazy_static! {
   pub static ref VOICE_ENGINE_CONFIG_MANAGER: Mutex<VoiceEngineConfigManager> =
@@ -58,12 +56,7 @@ impl VoiceEngineConfig {
     }
 }
 
-fn get_config_path() -> PathBuf {
-    let config_path = utils::get_config_path().join(VOICE_ENGINE_CONFIG_FILE);
-    config_path
-}
-
-fn gen_default_config(config_path: PathBuf) -> Result<VoiceEngineConfig, ConfigError> {
+fn gen_default_config() -> Result<VoiceEngineConfig, ConfigError> {
     let default_config = VoiceEngineConfig {
         engine_type: EngineType::VoiceVox,
         config: EngineConfig::VoiceVox(VoiceVoxEngineConfig {
@@ -71,29 +64,26 @@ fn gen_default_config(config_path: PathBuf) -> Result<VoiceEngineConfig, ConfigE
             api_addr: String::new(),
         }),
     };
-    config::save_config(config_path.to_str().unwrap(), &default_config)?;
+    config::save_config(VOICE_ENGINE_CONFIG, &default_config)?;
     Ok(default_config)
 }
 
 fn load_voice_engine_config() -> Result<VoiceEngineConfig, ConfigError> {
-    let config_path = get_config_path();
-    if !config_path.exists() {
-        let default_config = gen_default_config(config_path.clone())?;
+    let default_config = config::get_config_raw::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG)?;
+    if default_config.is_none() {
+        let default_config = gen_default_config()?;
         return Ok(default_config);
     }
-    config::load_config::<VoiceEngineConfig>(
-        config_path.to_str().unwrap(),
-    )
+    config::load_config::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG)
 }
 
 fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ConfigError> {
-    let config_path = get_config_path();
-    if !config_path.exists() {
-        gen_default_config(config_path.clone())?;
+    let default_config = config::get_config_raw::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG)?;
+    if default_config.is_none() {
+        gen_default_config()?;
         return Ok(());
     }
-    config::save_config(config_path.to_str().unwrap(),
-                        config)
+    config::save_config(VOICE_ENGINE_CONFIG, config)
 }
 
 #[derive(Debug)]

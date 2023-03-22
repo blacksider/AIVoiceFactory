@@ -3,6 +3,8 @@
 
 use tauri::{AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, Window, Wry};
 
+use crate::controller::{audio_manager, generator};
+
 mod logger;
 mod cypher;
 mod config;
@@ -62,6 +64,14 @@ fn main() {
             let window_x = screen_width - window_width;
             let window_y = 100;
             window.set_position(tauri::PhysicalPosition { x: window_x, y: window_y })?;
+
+            tauri::async_runtime::spawn(async {
+                audio_manager::watch_audio_devices(window);
+            });
+            tauri::async_runtime::spawn(async {
+                generator::start_check_audio_caches();
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -70,8 +80,11 @@ fn main() {
             commands::mapping::cmd::get_auto_translation_config,
             commands::mapping::cmd::save_auto_translation_config,
             commands::mapping::cmd::list_audios,
+            commands::mapping::cmd::get_audio_detail,
+            commands::mapping::cmd::play_audio,
             commands::mapping::cmd::generate_audio,
-            commands::mapping::cmd::check_audio_caches,
+            commands::mapping::cmd::get_audio_config,
+            commands::mapping::cmd::change_output_device,
         ])
         .system_tray(create_system_tray())
         .on_system_tray_event(handle_system_tray_event)

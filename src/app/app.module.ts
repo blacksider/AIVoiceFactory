@@ -7,7 +7,8 @@ import {MainPageComponent} from './main-page/main-page.component';
 
 import {registerLocaleData} from '@angular/common';
 import en from '@angular/common/locales/en';
-import {en_US, NZ_DATE_CONFIG, NZ_I18N} from 'ng-zorro-antd/i18n';
+import zh from '@angular/common/locales/zh';
+import {NZ_DATE_CONFIG, NZ_I18N, zh_CN} from 'ng-zorro-antd/i18n';
 import {NzTabsModule} from 'ng-zorro-antd/tabs';
 import {WindowComponent} from './window/window.component';
 import {VoiceEngineComponent} from './voice-engine/voice-engine.component';
@@ -26,9 +27,18 @@ import {NzFormModule} from 'ng-zorro-antd/form';
 import {NzDividerModule} from 'ng-zorro-antd/divider';
 import {NzCheckboxModule} from 'ng-zorro-antd/checkbox';
 import {NzNotificationModule} from 'ng-zorro-antd/notification';
-import {NzListModule} from 'ng-zorro-antd/list';
+import {NzCollapseModule} from 'ng-zorro-antd/collapse';
+import {NzSpinModule} from 'ng-zorro-antd/spin';
+import {NzTableModule} from 'ng-zorro-antd/table';
+import {NzResizableModule} from 'ng-zorro-antd/resizable';
+import {IconDefinition} from '@ant-design/icons-angular';
+import {NzIconModule} from 'ng-zorro-antd/icon';
+import {PlayCircleOutline} from '@ant-design/icons-angular/icons';
+
+const icons: IconDefinition[] = [PlayCircleOutline];
 
 registerLocaleData(en);
+registerLocaleData(zh);
 
 @NgModule({
   declarations: [
@@ -57,10 +67,14 @@ registerLocaleData(en);
     NzDividerModule,
     NzCheckboxModule,
     NzNotificationModule,
-    NzListModule
+    NzCollapseModule,
+    NzSpinModule,
+    NzTableModule,
+    NzResizableModule,
+    NzIconModule.forRoot(icons),
   ],
   providers: [
-    {provide: NZ_I18N, useValue: en_US},
+    {provide: NZ_I18N, useValue: zh_CN},
     {
       provide: NZ_DATE_CONFIG, useValue: {
         firstDayOfWeek: 1

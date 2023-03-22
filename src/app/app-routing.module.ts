@@ -7,6 +7,7 @@ import {AutoTranslationComponent} from './auto-translation/auto-translation.comp
 import {SettingsComponent} from './settings/settings.component';
 import {voiceEngineConfigResolver} from './voice-engine/voice-engine.service';
 import {autoTranslationConfigResolver} from './auto-translation/auto-translation.service';
+import {audioConfigResolver} from './settings/settings.service';
 
 const routes: Routes = [
   {
@@ -28,7 +29,13 @@ const routes: Routes = [
           config: autoTranslationConfigResolver
         }
       },
-      {path: 'settings', component: SettingsComponent}
+      {
+        path: 'settings',
+        component: SettingsComponent,
+        resolve: {
+          audioConfig: audioConfigResolver
+        }
+      }
     ]
   }
 ];

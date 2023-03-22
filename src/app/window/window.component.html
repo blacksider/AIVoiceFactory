@@ -1,34 +1,66 @@
-<div nz-row nzGutter="10" class="h-100">
-  <div nz-col nzXs="24" nzSm="12" nzMd="12" nzLg="6" nzXl="6"
-       class="main-border">
-    <nz-layout class="h-100">
-      <nz-content>
-        <nz-card [nzBordered]="false" nzTitle="用户输入" nzSize="small"
-                 class="main-card"
-                 [nzBodyStyle]="{flex: '1 1 auto', padding: '10px 0 0'}">
+<nz-layout class="h-100">
+  <nz-layout>
+    <nz-sider
+        [nzWidth]="siderWidth"
+        nz-resizable
+        [nzMinWidth]="100"
+        (nzResize)="onSideResize($event)">
+      <nz-resize-handle nzDirection="right">
+        <div class="sider-resize-line"></div>
+      </nz-resize-handle>
+      <nz-layout class="input-content">
+        <nz-content>
+          <nz-card [nzBordered]="false" nzTitle="用户输入" nzSize="small"
+                   class="main-card"
+                   [nzBodyStyle]="{flex: '1 1 auto', padding: '10px 0 0'}">
           <textarea nz-input
                     [(ngModel)]="inputMessage"
                     class="h-100 no-resize">
           </textarea>
-        </nz-card>
-      </nz-content>
-      <nz-footer>
-        <div nz-row nzJustify="end">
-          <button nz-button nzType="primary" (click)="play()">生成语音</button>
-        </div>
-      </nz-footer>
-    </nz-layout>
-  </div>
-  <div nz-col nzXs="24" nzSm="12" nzMd="12" nzLg="18" nzXl="18">
-    <nz-card [nzBordered]="false" nzTitle="监控" nzSize="small"
-             class="main-card"
-             [nzBodyStyle]="{flex: '1 1 auto'}">
-      <nz-list nzBordered nzSize="small">
-        <nz-list-header>已生成</nz-list-header>
-        <nz-list-item *ngFor="let item of audios">
-          {{item.time}}: {{item.name}}
-        </nz-list-item>
-      </nz-list>
-    </nz-card>
-  </div>
-</div>
+          </nz-card>
+        </nz-content>
+        <nz-footer>
+          <div nz-row nzJustify="end">
+            <button nz-button nzType="primary" (click)="generate()">生成语音</button>
+          </div>
+        </nz-footer>
+      </nz-layout>
+    </nz-sider>
+    <nz-content>
+      <nz-card [nzBordered]="false" nzTitle="监控" nzSize="small"
+               class="main-card"
+               [nzBodyStyle]="{flex: '1 1 auto'}">
+        <nz-collapse nzAccordion>
+          <nz-collapse-panel *ngFor="let item of audios"
+                             nzHeader="{{item.time | date: 'yyyy-MM-dd HH:mm:ss'}}: {{item.name}}"
+                             [nzExtra]="itemExtra"
+                             (nzActiveChange)="onExpandItem($event, item)">
+            <ng-template #itemExtra>
+              <div (click)="$event.stopPropagation();">
+                <span nz-icon nzType="play-circle" nzTheme="outline"
+                      (click)="playAudio(item.name)" i></span>
+              </div>
+            </ng-template>
+            <div *ngIf="audioDetails[item.name]; else loading">
+              <nz-table [nzTemplateMode]="true">
+                <tbody>
+                <tr>
+                  <td style="width: 90px">源内容：</td>
+                  <td>{{audioDetails[item.name].source}}</td>
+                </tr>
+                <tr>
+                  <td>处理后：</td>
+                  <td>{{audioDetails[item.name].translated}}</td>
+                </tr>
+                </tbody>
+              </nz-table>
+            </div>
+            <ng-template #loading>
+              <nz-spin nzSimple></nz-spin>
+            </ng-template>
+          </nz-collapse-panel>
+        </nz-collapse>
+      </nz-card>
+    </nz-content>
+  </nz-layout>
+</nz-layout>

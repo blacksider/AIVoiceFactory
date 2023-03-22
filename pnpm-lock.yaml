@@ -12,6 +12,7 @@ specifiers:
   '@angular/platform-browser': ^15.2.0
   '@angular/platform-browser-dynamic': ^15.2.0
   '@angular/router': ^15.2.0
+  '@ant-design/icons-angular': ^15.0.0
   '@tauri-apps/api': ^1.2.0
   '@tauri-apps/cli': ^1.2.2
   '@types/jasmine': ~4.3.0
@@ -36,6 +37,7 @@ dependencies:
   '@angular/platform-browser': 15.2.2_67tth7lseo52y77w7j2bbt7gai
   '@angular/platform-browser-dynamic': 15.2.2_pbblcghlnqr2rvkrg2skpac4ri
   '@angular/router': 15.2.2_l5mfipeoizzgchs5c5d4qx66yu
+  '@ant-design/icons-angular': 15.0.0_l5mfipeoizzgchs5c5d4qx66yu
   '@tauri-apps/api': 1.2.0
   ng-zorro-antd: 15.0.3_fsoqx2okrd4n5jnxqtb5sd4gdy
   rxjs: 7.8.0

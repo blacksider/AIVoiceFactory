@@ -1,1 +1,22 @@
-<p>settings works!</p>
+<form nz-form class="settings-form">
+  <nz-divider nzPlain [nzText]="audioTitle" nzOrientation="left">
+    <ng-template #audioTitle><b>声音设置</b></ng-template>
+  </nz-divider>
+  <div nz-row>
+    <div nz-col nzLg="6" nzSm="12">
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24">输出设备</nz-form-label>
+        <nz-form-control [nzSpan]="24">
+          <nz-select id="outputDevice" name="outputDevice"
+                     [(ngModel)]="selectAudioOutput"
+                     (ngModelChange)="onChangeAudioOutput()">
+            <nz-option *ngFor="let device of audioOutputs"
+                       [nzValue]="device"
+                       [nzLabel]="getDeviceLabel(device)">
+            </nz-option>
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+    </div>
+  </div>
+</form>

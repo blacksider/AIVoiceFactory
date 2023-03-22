@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
@@ -8,9 +7,9 @@ use strum_macros::EnumString;
 
 use crate::config::config;
 use crate::config::config::ConfigError;
-use crate::utils;
 
-static TRANSLATION_CONFIG_FILE: &str = "auto_translation.cfg";
+static TRANSLATION_CONFIG: &str = "auto_translation";
+static SALT: &str = "1435660288";
 
 lazy_static! {
    pub static ref AUTO_TRANS_CONFIG_MANAGER: Mutex<AutoTranslationConfigManager> = Mutex::new(AutoTranslationConfigManager::init());
@@ -39,7 +38,11 @@ pub struct TranslateByBaidu {
     to: String,
 }
 
-static SALT: &str = "1435660288";
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoTranslationConfig {
+    enable: bool,
+    tool: AutoTranslateTool,
+}
 
 impl TranslateByBaidu {
     pub fn get_api(self) -> String {
@@ -64,12 +67,6 @@ impl TranslateByBaidu {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AutoTranslationConfig {
-    enable: bool,
-    tool: AutoTranslateTool,
-}
-
 impl AutoTranslationConfig {
     pub fn translated_by_baidu(self) -> (bool, Option<TranslateByBaidu>) {
         if !self.enable {
@@ -83,12 +80,7 @@ impl AutoTranslationConfig {
     }
 }
 
-fn get_config_path() -> PathBuf {
-    let config_path = utils::get_config_path().join(TRANSLATION_CONFIG_FILE);
-    config_path
-}
-
-fn gen_default_config(config_path: PathBuf) -> Result<AutoTranslationConfig, ConfigError> {
+fn gen_default_config() -> Result<AutoTranslationConfig, ConfigError> {
     let empty_str = "".to_string();
     let default_config = AutoTranslationConfig {
         enable: false,
@@ -100,29 +92,26 @@ fn gen_default_config(config_path: PathBuf) -> Result<AutoTranslationConfig, Con
             to: "jp".to_string(),
         }),
     };
-    config::save_config(config_path.to_str().unwrap(), &default_config)?;
+    config::save_config(TRANSLATION_CONFIG, &default_config)?;
     Ok(default_config)
 }
 
 pub fn load_auto_translation_config() -> Result<AutoTranslationConfig, ConfigError> {
-    let config_path = get_config_path();
-    if !config_path.exists() {
-        let default_config = gen_default_config(config_path.clone())?;
+    let default_config = config::get_config_raw::<AutoTranslationConfig>(TRANSLATION_CONFIG)?;
+    if default_config.is_none() {
+        let default_config = gen_default_config()?;
         return Ok(default_config);
     }
-    config::load_config::<AutoTranslationConfig>(
-        config_path.to_str().unwrap(),
-    )
+    config::load_config::<AutoTranslationConfig>(TRANSLATION_CONFIG)
 }
 
 pub fn save_auto_translation_config(config: &AutoTranslationConfig) -> Result<(), ConfigError> {
-    let config_path = get_config_path();
-    if !config_path.exists() {
-        gen_default_config(config_path.clone())?;
+    let default_config = config::get_config_raw::<AutoTranslationConfig>(TRANSLATION_CONFIG)?;
+    if default_config.is_none() {
+        gen_default_config()?;
         return Ok(());
     }
-    config::save_config(config_path.to_str().unwrap(),
-                        config)
+    config::save_config(TRANSLATION_CONFIG, config)
 }
 
 #[derive(Debug)]

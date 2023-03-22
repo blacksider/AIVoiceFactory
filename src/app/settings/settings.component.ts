@@ -1,10 +1,83 @@
-import { Component } from '@angular/core';
+import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
+import {SettingsService} from './settings.service';
+import {ActivatedRoute} from '@angular/router';
+import {AudioConfigResponseData, AudioSelection, SelectByName, SelectDefault} from './settings';
+import {listen} from '@tauri-apps/api/event'
 
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.less']
 })
-export class SettingsComponent {
+export class SettingsComponent implements OnInit, OnDestroy {
+  audioConfig!: AudioConfigResponseData;
 
+  audioOutputs!: AudioSelection[];
+  selectAudioOutput!: AudioSelection;
+  unListenChanges?: () => void;
+
+  constructor(private service: SettingsService,
+              private activatedRoute: ActivatedRoute,
+              private ngZone: NgZone) {
+  }
+
+  ngOnInit(): void {
+    this.activatedRoute.data.subscribe(
+      ({audioConfig}) => {
+        this.audioConfig = audioConfig as AudioConfigResponseData;
+        this.initAudioOutputs();
+      });
+    listen('on_audio_config_change', this.updateAudioConfig.bind(this))
+      .then((fn) => {
+        this.unListenChanges = fn;
+      });
+  }
+
+  ngOnDestroy(): void {
+    if (this.unListenChanges) {
+      this.unListenChanges();
+    }
+  }
+
+  private updateAudioConfig() {
+    console.log("changed", this);
+    this.service.getAudioConfig().subscribe(config => {
+      this.ngZone.run(() => {
+        this.audioConfig = config;
+        this.initAudioOutputs();
+      });
+    });
+  }
+
+  private initAudioOutputs(): void {
+    this.audioOutputs = [new SelectDefault()];
+    if (this.audioConfig?.output_devices?.length > 0) {
+      this.audioConfig.output_devices.forEach(value => {
+        const selByName = new SelectByName();
+        selByName.name = value;
+        this.audioOutputs.push(selByName)
+      });
+    }
+    this.selectAudioOutput = this.audioOutputs[0];
+    if (this.audioConfig?.config.output.type == 'ByName') {
+      const byName = this.audioConfig?.config.output as SelectByName;
+      for (let output of this.audioOutputs) {
+        if (output instanceof SelectByName && output.name === byName.name) {
+          this.selectAudioOutput = output;
+        }
+      }
+    }
+  }
+
+  onChangeAudioOutput() {
+    this.service.changeOutputDevice(this.selectAudioOutput)
+      .subscribe(config => {
+        this.audioConfig = config;
+        this.initAudioOutputs();
+      });
+  }
+
+  getDeviceLabel(device: AudioSelection): string {
+    return device instanceof SelectByName ? device.name : '默认设备';
+  }
 }

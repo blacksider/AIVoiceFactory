@@ -54,3 +54,11 @@ docker run --name whisper -d -t -p 9000:9000 -e ASR_MODEL=base onerahmet/openai-
 ```
 http://localhost:9000/docs
 ```
+
+## 如何编译
+
+> 运行 `pnpm run release` 编译程序  
+
+> Windows下如果出现 `wix311-binaries` 无法下载的情况，
+> 可以手动下载 `https://github.com/wixtoolset/wix3/releases/download/wix3111rtm/wix311-binaries.zip` ，
+> 并将该文件内容解压到 `C:\Users\Your-Username\AppData\Local\tauri\WixTools` 下即可
