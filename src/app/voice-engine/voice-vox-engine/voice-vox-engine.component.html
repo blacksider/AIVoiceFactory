@@ -1,0 +1,38 @@
+<ng-container [formGroup]="config">
+  <i>配置Voice Vox Engine的API连接和语音配置</i>
+  <nz-form-item>
+    <nz-form-label [nzSpan]="24" nzFor="address">API地址</nz-form-label>
+    <nz-form-control nzMd="12" nzXs="24">
+      <nz-input-group [nzAddOnBefore]="protocolTemplate">
+        <ng-template #protocolTemplate>
+          <nz-select id="protocol" name="protocol" formControlName="protocol"
+                     class="protocol-select">
+            <nz-option nzLabel="http://" nzValue="http"></nz-option>
+            <nz-option nzLabel="https://" nzValue="https"></nz-option>
+          </nz-select>
+        </ng-template>
+        <input id="address" name="address" nz-input formControlName="apiAddr"/>
+      </nz-input-group>
+    </nz-form-control>
+  </nz-form-item>
+  <nz-form-item>
+    <nz-form-control [nzSpan]="24">
+      <button nz-button nzType="default" nzSize="default" (click)="loadSpeakers()">刷新角色</button>
+    </nz-form-control>
+  </nz-form-item>
+  <nz-form-item>
+    <nz-form-label [nzSpan]="24">语音角色</nz-form-label>
+    <nz-form-control [nzSpan]="24">
+      <ng-container *ngIf="!!speakers">
+        <div nz-row nzGutter="10" class="speaker-content">
+          <div *ngFor="let speaker of speakers" nz-col nzMd="6" nzSm="12" nzXs="24">
+            <app-voice-vox-speaker [speaker]="speaker"
+                                   [selectedSpeakerUuid]="speakerUuid"
+                                   [selectedSpeakerStyleId]="speakerStyleId">
+            </app-voice-vox-speaker>
+          </div>
+        </div>
+      </ng-container>
+    </nz-form-control>
+  </nz-form-item>
+</ng-container>

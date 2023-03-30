@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 
 use crate::config::config;
-use crate::config::config::ConfigError;
+use crate::controller::errors::ProgramError;
 
 static VOICE_ENGINE_CONFIG: &str = "voice_engine";
 
@@ -23,11 +23,17 @@ pub struct VoiceVoxEngineConfig {
     protocol: String,
     #[serde(rename = "apiAddr")]
     api_addr: String,
+    speaker_uuid: String,
+    speaker_style_id: i32,
 }
 
 impl VoiceVoxEngineConfig {
     pub fn build_api(&self) -> String {
         format!("{}://{}", self.protocol, self.api_addr)
+    }
+
+    pub fn get_speaker(&self) -> i32 {
+        self.speaker_style_id
     }
 }
 
@@ -56,19 +62,21 @@ impl VoiceEngineConfig {
     }
 }
 
-fn gen_default_config() -> Result<VoiceEngineConfig, ConfigError> {
+fn gen_default_config() -> Result<VoiceEngineConfig, ProgramError> {
     let default_config = VoiceEngineConfig {
         engine_type: EngineType::VoiceVox,
         config: EngineConfig::VoiceVox(VoiceVoxEngineConfig {
             protocol: "http".to_string(),
             api_addr: String::new(),
+            speaker_uuid: "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff".to_string(),
+            speaker_style_id: 0,
         }),
     };
     config::save_config(VOICE_ENGINE_CONFIG, &default_config)?;
     Ok(default_config)
 }
 
-fn load_voice_engine_config() -> Result<VoiceEngineConfig, ConfigError> {
+fn load_voice_engine_config() -> Result<VoiceEngineConfig, ProgramError> {
     let default_config = config::get_config_raw::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG)?;
     if default_config.is_none() {
         let default_config = gen_default_config()?;
@@ -77,7 +85,7 @@ fn load_voice_engine_config() -> Result<VoiceEngineConfig, ConfigError> {
     config::load_config::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG)
 }
 
-fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ConfigError> {
+fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ProgramError> {
     let default_config = config::get_config_raw::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG)?;
     if default_config.is_none() {
         gen_default_config()?;
@@ -135,6 +143,8 @@ mod tests {
             config: EngineConfig::VoiceVox(VoiceVoxEngineConfig {
                 protocol: protocol.clone(),
                 api_addr: api_addr.clone(),
+                speaker_uuid: "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff".to_string(),
+                speaker_style_id: 0,
             }),
         };
         let json_value = serde_json::to_string(&config).unwrap();

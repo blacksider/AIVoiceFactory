@@ -1,0 +1,41 @@
+<nz-card [nzTitle]="speaker.name" nzSize="small"
+         [ngClass]="{'selected': selectedSpeakerUuid.value === speaker.speaker_uuid}"
+         (click)="selectSpeaker()">
+  <div class="image-wrap">
+    <img nz-image
+         [nzSrc]="displayIcon"
+         [nzFallback]="fallback"
+         [nzDisablePreview]="true"
+         [alt]="speaker.name"/>
+  </div>
+  <div class="attr-wrap">
+    <div class="attrs">
+      <span class="attr-label">类型</span>
+      <div class="attr-content">
+        <nz-select id="selectStyle" name="selectStyle"
+                   [(ngModel)]="displayStyleId"
+                   (click)="$event.stopPropagation()"
+                   (ngModelChange)="changeStyle()">
+          <nz-option *ngFor="let style of speaker.styles"
+                     [nzValue]="style.id" [nzLabel]="style.name"></nz-option>
+        </nz-select>
+      </div>
+    </div>
+    <div class="attrs">
+      <span class="attr-label">声音样本</span>
+      <div class="attr-content">
+        <div nz-space [nzSize]="10" nzAlign="center">
+          <ng-container *ngFor="let sample of styleSamples">
+            <span *nzSpaceItem
+                  class="play-sample"
+                  nz-icon
+                  [nzType]="sample === playingSample ? 'pause-circle' : 'play-circle'"
+                  nzTheme="outline"
+                  (click)="$event.stopPropagation();playSample(sample)">
+            </span>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+</nz-card>

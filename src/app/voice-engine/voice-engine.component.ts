@@ -32,19 +32,13 @@ export class VoiceEngineComponent implements OnInit {
           type: [voiceEngineConfig.type]
         });
 
+        const configTypeControl = this.fb.control(voiceEngineConfig.type);
+        this.type.valueChanges.subscribe(value => {
+          configTypeControl.setValue(value);
+        });
+
         if (voiceEngineConfig.type === EngineTypes.VoiceVox) {
-          const voiceVoxConfig = voiceEngineConfig.config as VoiceVoxEngineConfig;
-          const configTypeControl = this.fb.control(voiceEngineConfig.type);
-          this.type.valueChanges.subscribe(value => {
-            configTypeControl.setValue(value);
-          });
-          this.voiceEngineConfigForm.addControl('config', this.fb.group({
-            type: configTypeControl,
-            config: this.fb.group({
-              protocol: [voiceVoxConfig.protocol],
-              apiAddr: [voiceVoxConfig.apiAddr]
-            })
-          }));
+          this.initVoiceVoxForm(configTypeControl, voiceEngineConfig.config as VoiceVoxEngineConfig);
         }
         this.voiceEngineConfigForm.valueChanges
           .pipe(
@@ -52,6 +46,7 @@ export class VoiceEngineComponent implements OnInit {
             debounceTime(500),
           )
           .subscribe(value => {
+            console.log('new value: ', value);
             this.service.saveVoiceEngineConfig(value).subscribe((ok) => {
               if (!ok) {
                 this.notification.error('警告', '配置更新失败！')
@@ -59,6 +54,23 @@ export class VoiceEngineComponent implements OnInit {
             });
           });
       });
+  }
+
+  private initVoiceVoxForm(configTypeControl: FormControl,
+                           voiceVoxConfig: VoiceVoxEngineConfig) {
+    this.voiceEngineConfigForm.addControl('config', this.fb.group({
+      type: configTypeControl,
+      config: this.fb.group({
+        protocol: [voiceVoxConfig.protocol],
+        apiAddr: [voiceVoxConfig.apiAddr],
+        speaker_uuid: [voiceVoxConfig.speaker_uuid],
+        speaker_style_id: [voiceVoxConfig.speaker_style_id],
+      })
+    }));
+  }
+
+  get config(): FormGroup {
+    return this.voiceEngineConfigForm.get('config')?.get('config') as FormGroup;
   }
 
   get type(): FormControl {

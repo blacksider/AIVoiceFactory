@@ -8,13 +8,13 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use rodio::{Decoder, OutputStream, Sink};
-use sled::transaction::ConflictableTransactionError;
 use sled::{IVec, Transactional};
-use crate::config::config::DB_MANAGER;
+use sled::transaction::ConflictableTransactionError;
 
+use crate::config::config::DB_MANAGER;
 use crate::config::voice_engine;
 use crate::controller::{audio_manager, translator};
-use crate::controller::errors::CommonError;
+use crate::controller::errors::{CommonError, ProgramError};
 use crate::controller::voice_engine::voice_vox;
 
 static AUDIO_DATA_TREE_INDEX: &str = "tree_index";
@@ -43,14 +43,12 @@ pub fn start_check_audio_caches() {
 }
 
 /// only save recent MAX_DATA_SIZE caches
-pub fn check_audio_caches() -> Result<(), Box<dyn Error>> {
+pub fn check_audio_caches() -> Result<(), ProgramError> {
     log::debug!("Check audio caches");
     let index_tree = DB_MANAGER.clone().db
-        .open_tree(AUDIO_DATA_TREE_INDEX)
-        .map_err(Box::new)?;
+        .open_tree(AUDIO_DATA_TREE_INDEX)?;
     let data_tree = DB_MANAGER.clone().db
-        .open_tree(AUDIO_DATA_TREE_DATA)
-        .map_err(Box::new)?;
+        .open_tree(AUDIO_DATA_TREE_DATA)?;
     log::debug!("Currently contains {} audio caches",index_tree.len());
     if index_tree.len() > MAX_DATA_SIZE {
         let cleans = index_tree.len() - MAX_DATA_SIZE;
@@ -204,7 +202,6 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
                 translated_text = data;
             }
     }
-
     let config = tauri::async_runtime::spawn_blocking(move || {
         let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().unwrap();
         manager.get_config()
@@ -286,3 +283,4 @@ fn play_encoded_audio(encoded: &IVec) -> Result<(), Box<dyn Error>> {
     sink.sleep_until_end();
     Ok(())
 }
+

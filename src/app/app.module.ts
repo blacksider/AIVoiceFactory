@@ -33,9 +33,12 @@ import {NzTableModule} from 'ng-zorro-antd/table';
 import {NzResizableModule} from 'ng-zorro-antd/resizable';
 import {IconDefinition} from '@ant-design/icons-angular';
 import {NzIconModule} from 'ng-zorro-antd/icon';
-import {PlayCircleOutline} from '@ant-design/icons-angular/icons';
+import {PlayCircleOutline, PauseCircleOutline} from '@ant-design/icons-angular/icons';
+import {VoiceVoxEngineComponent} from './voice-engine/voice-vox-engine/voice-vox-engine.component';
+import {VoiceVoxSpeakerComponent} from './voice-engine/voice-vox-speaker/voice-vox-speaker.component';
+import {NzImageModule} from 'ng-zorro-antd/image';
 
-const icons: IconDefinition[] = [PlayCircleOutline];
+const icons: IconDefinition[] = [PlayCircleOutline, PauseCircleOutline];
 
 registerLocaleData(en);
 registerLocaleData(zh);
@@ -47,7 +50,9 @@ registerLocaleData(zh);
     WindowComponent,
     VoiceEngineComponent,
     AutoTranslationComponent,
-    SettingsComponent
+    SettingsComponent,
+    VoiceVoxEngineComponent,
+    VoiceVoxSpeakerComponent
   ],
   imports: [
     BrowserModule,
@@ -72,6 +77,7 @@ registerLocaleData(zh);
     NzTableModule,
     NzResizableModule,
     NzIconModule.forRoot(icons),
+    NzImageModule,
   ],
   providers: [
     {provide: NZ_I18N, useValue: zh_CN},

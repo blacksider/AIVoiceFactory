@@ -1,10 +1,12 @@
 pub mod cmd {
     use crate::config::{auto_translation, voice_engine};
     use crate::config::auto_translation::AutoTranslationConfig;
-    use crate::config::voice_engine::VoiceEngineConfig;
+    use crate::config::voice_engine::{VoiceEngineConfig, VoiceVoxEngineConfig};
     use crate::controller::{audio_manager, generator};
     use crate::controller::audio_manager::{AudioConfigResponseData, AudioSelection};
     use crate::controller::generator::{AudioCacheDetail, AudioCacheIndex};
+    use crate::controller::voice_engine::voice_vox;
+    use crate::controller::voice_engine::voice_vox::{VoiceVoxSpeaker, VoiceVoxSpeakerInfo};
 
     #[tauri::command]
     pub fn get_voice_engine_config() -> Option<VoiceEngineConfig> {
@@ -106,6 +108,55 @@ pub mod cmd {
             }
         }
         None
+    }
+
+    async fn get_voice_vox_config() -> Option<VoiceVoxEngineConfig> {
+        let config = tauri::async_runtime::spawn_blocking(move || {
+            let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().unwrap();
+            manager.get_config()
+        }).await;
+        if config.is_err() {
+            log::error!("Failed to retrieve voice engine config");
+            return None;
+        }
+        let config = config.unwrap();
+        if !config.is_voice_vox_config() {
+            log::error!("Current voice engine is not voice vox");
+            return None;
+        }
+        Some(config.get_voice_vox_config())
+    }
+
+    #[tauri::command]
+    pub async fn get_voice_vox_speakers() -> Option<Vec<VoiceVoxSpeaker>> {
+        let config = get_voice_vox_config().await;
+        if config.is_none() {
+            return None;
+        }
+        let result = voice_vox::speakers(&config.unwrap()).await;
+        match result {
+            Ok(res) => Some(res),
+            Err(err) => {
+                log::error!("Failed to load voice vox speakers, err: {}", err);
+                None
+            }
+        }
+    }
+
+    #[tauri::command]
+    pub async fn get_voice_vox_speaker_info(speaker_uuid: String) -> Option<VoiceVoxSpeakerInfo> {
+        let config = get_voice_vox_config().await;
+        if config.is_none() {
+            return None;
+        }
+        let result = voice_vox::speaker_info(&config.unwrap(), speaker_uuid).await;
+        match result {
+            Ok(res) => Some(res),
+            Err(err) => {
+                log::error!("Failed to load voice vox speaker info, err: {}", err);
+                None
+            }
+        }
     }
 
     #[tauri::command]

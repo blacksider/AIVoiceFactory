@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumString;
 
 use crate::config::config;
-use crate::config::config::ConfigError;
+use crate::controller::errors::ProgramError;
 
 static TRANSLATION_CONFIG: &str = "auto_translation";
 static SALT: &str = "1435660288";
@@ -80,7 +80,7 @@ impl AutoTranslationConfig {
     }
 }
 
-fn gen_default_config() -> Result<AutoTranslationConfig, ConfigError> {
+fn gen_default_config() -> Result<AutoTranslationConfig, ProgramError> {
     let empty_str = "".to_string();
     let default_config = AutoTranslationConfig {
         enable: false,
@@ -96,7 +96,7 @@ fn gen_default_config() -> Result<AutoTranslationConfig, ConfigError> {
     Ok(default_config)
 }
 
-pub fn load_auto_translation_config() -> Result<AutoTranslationConfig, ConfigError> {
+pub fn load_auto_translation_config() -> Result<AutoTranslationConfig, ProgramError> {
     let default_config = config::get_config_raw::<AutoTranslationConfig>(TRANSLATION_CONFIG)?;
     if default_config.is_none() {
         let default_config = gen_default_config()?;
@@ -105,7 +105,7 @@ pub fn load_auto_translation_config() -> Result<AutoTranslationConfig, ConfigErr
     config::load_config::<AutoTranslationConfig>(TRANSLATION_CONFIG)
 }
 
-pub fn save_auto_translation_config(config: &AutoTranslationConfig) -> Result<(), ConfigError> {
+pub fn save_auto_translation_config(config: &AutoTranslationConfig) -> Result<(), ProgramError> {
     let default_config = config::get_config_raw::<AutoTranslationConfig>(TRANSLATION_CONFIG)?;
     if default_config.is_none() {
         gen_default_config()?;

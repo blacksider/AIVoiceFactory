@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "ai_voice_factory"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "aes",
  "base64 0.21.0",
@@ -42,6 +42,7 @@ dependencies = [
  "bytes",
  "chrono",
  "cpal",
+ "hound",
  "lazy_static",
  "log",
  "log4rs",

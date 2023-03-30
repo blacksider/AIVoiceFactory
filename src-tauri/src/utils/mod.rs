@@ -1,3 +1,5 @@
+pub mod http;
+
 use std::env::current_dir;
 use std::path::PathBuf;
 

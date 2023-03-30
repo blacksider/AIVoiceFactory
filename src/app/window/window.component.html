@@ -38,6 +38,7 @@
             <ng-template #itemExtra>
               <div (click)="$event.stopPropagation();">
                 <span nz-icon nzType="play-circle" nzTheme="outline"
+                      class="play-audio"
                       (click)="playAudio(item.name)" i></span>
               </div>
             </ng-template>
