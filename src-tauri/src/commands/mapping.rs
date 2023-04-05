@@ -206,6 +206,19 @@ pub mod cmd {
     }
 
     #[tauri::command]
+    pub fn change_input_device(selection: AudioSelection) -> Option<AudioConfigResponseData> {
+        match audio_manager::change_input_device(selection) {
+            Ok(data) => {
+                return Some(data);
+            }
+            Err(err) => {
+                log::error!("Failed to change audio input device, err: {}", err);
+            }
+        }
+        None
+    }
+
+    #[tauri::command]
     pub fn is_recorder_recording() -> bool {
         audio_recorder::is_recording()
     }

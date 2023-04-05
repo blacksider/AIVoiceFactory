@@ -100,6 +100,7 @@ fn main() {
             commands::mapping::cmd::get_voice_vox_speakers,
             commands::mapping::cmd::get_voice_vox_speaker_info,
             commands::mapping::cmd::change_output_device,
+            commands::mapping::cmd::change_input_device,
             commands::mapping::cmd::is_recorder_recording,
         ])
         .system_tray(create_system_tray())

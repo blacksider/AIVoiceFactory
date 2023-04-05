@@ -1,10 +1,10 @@
 <nz-layout class="h-100">
   <nz-layout>
     <nz-sider
-        [nzWidth]="siderWidth"
-        nz-resizable
-        [nzMinWidth]="100"
-        (nzResize)="onSideResize($event)">
+      [nzWidth]="siderWidth"
+      nz-resizable
+      [nzMinWidth]="100"
+      (nzResize)="onSideResize($event)">
       <nz-resize-handle nzDirection="right">
         <div class="sider-resize-line"></div>
       </nz-resize-handle>
@@ -22,7 +22,9 @@
         <nz-footer>
           <div nz-row nzJustify="end" nzAlign="middle" nzGutter="10">
             <div nz-col>
-              <label nz-checkbox id="syncOnTextRecognize" name="syncOnTextRecognize" [(ngModel)]="syncOnTextRecognize">
+              <label nz-checkbox id="syncOnTextRecognize" name="syncOnTextRecognize"
+                     [(ngModel)]="syncOnTextRecognize"
+                     (ngModelChange)="onSyncValueChange()">
                 <span>同步语音识别</span>
               </label>
             </div>

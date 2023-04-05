@@ -81,8 +81,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
       });
     }
     this.selectAudioInput = this.audioInputs[0];
-    if (this.audioConfig?.config.output.type == 'ByName') {
-      const byName = this.audioConfig?.config.output as SelectByName;
+    if (this.audioConfig?.config.input.type == 'ByName') {
+      const byName = this.audioConfig?.config.input as SelectByName;
       for (let input of this.audioInputs) {
         if (input instanceof SelectByName && input.name === byName.name) {
           this.selectAudioInput = input;
@@ -93,6 +93,15 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   onChangeAudioOutput() {
     this.service.changeOutputDevice(this.selectAudioOutput)
+      .subscribe(config => {
+        this.audioConfig = config;
+        this.initAudioOutputs();
+        this.initAudioInputs();
+      });
+  }
+
+  onChangeAudioInput() {
+    this.service.changeInputDevice(this.selectAudioInput)
       .subscribe(config => {
         this.audioConfig = config;
         this.initAudioOutputs();

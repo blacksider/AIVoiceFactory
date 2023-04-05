@@ -19,6 +19,10 @@ export class SettingsService {
   changeOutputDevice(selection: AudioSelection): Observable<AudioConfigResponseData> {
     return fromPromise<AudioConfigResponseData>(invoke<AudioConfigResponseData>('change_output_device', {selection}));
   }
+
+  changeInputDevice(selection: AudioSelection): Observable<AudioConfigResponseData> {
+    return fromPromise<AudioConfigResponseData>(invoke<AudioConfigResponseData>('change_input_device', {selection}));
+  }
 }
 
 export const audioConfigResolver: ResolveFn<AudioConfigResponseData> =

@@ -10,12 +10,6 @@ import {AudioCacheDetail, AudioCacheIndex} from './audio-data';
 export class WindowService {
 
   constructor() {
-
-  }
-
-  checkAudioCaches(): void {
-    invoke<any>('check_audio_caches').then(_ => {
-    });
   }
 
   listAudios(): Observable<AudioCacheIndex[]> {
