@@ -21,9 +21,11 @@ export class SelectByName extends AudioSelection {
 
 export class AudioSelectionConfig {
   output!: AudioSelection;
+  input!: AudioSelection;
 }
 
 export class AudioConfigResponseData {
   config!: AudioSelectionConfig;
   output_devices!: string[];
+  input_devices!: string[];
 }

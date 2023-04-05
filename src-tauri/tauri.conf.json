@@ -1,8 +1,8 @@
 {
   "build": {
-    "beforeDevCommand": "pnpm start --port 1420",
+    "beforeDevCommand": "pnpm start --port 5420",
     "beforeBuildCommand": "pnpm build",
-    "devPath": "http://localhost:1420",
+    "devPath": "http://localhost:5420",
     "distDir": "../dist/AIVoiceFactory",
     "withGlobalTauri": false
   },
@@ -16,6 +16,9 @@
       "shell": {
         "all": false,
         "open": true
+      },
+      "globalShortcut": {
+        "all": true
       }
     },
     "bundle": {

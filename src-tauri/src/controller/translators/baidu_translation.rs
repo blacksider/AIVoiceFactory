@@ -1,4 +1,5 @@
 use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::StatusCode;
 
 use crate::config::auto_translation::TranslateByBaidu;
 use crate::controller::errors::{CommonError, ProgramError};
@@ -16,7 +17,7 @@ pub async fn translate(config: &TranslateByBaidu, text: String) -> Result<String
         .send()
         .await
         .map_err(ProgramError::from)?;
-    if res.status() == 200 {
+    if res.status() == StatusCode::OK {
         let json: serde_json::Value = res.json().await.map_err(ProgramError::from)?;
         let result = json["trans_result"][0]["dst"].as_str().unwrap();
         log::debug!("Translated text by baidu api, result: {}", result);

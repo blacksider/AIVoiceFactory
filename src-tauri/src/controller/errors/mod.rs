@@ -49,10 +49,30 @@ impl fmt::Display for ProgramError {
     }
 }
 
+unsafe impl Send for ProgramError {}
+
+unsafe impl Sync for ProgramError {}
+
 impl ProgramError {
     pub fn wrap<E>(err: E) -> ProgramError where E: Error + 'static {
         ProgramError {
             error: Box::new(err)
+        }
+    }
+}
+
+impl From<&str> for ProgramError {
+    fn from(err: &str) -> Self {
+        ProgramError {
+            error: Box::new(CommonError::new(err.to_string()))
+        }
+    }
+}
+
+impl From<String> for ProgramError {
+    fn from(err: String) -> Self {
+        ProgramError {
+            error: Box::new(CommonError::new(err))
         }
     }
 }
@@ -75,8 +95,13 @@ impl_program_error!(reqwest::Error);
 impl_program_error!(cpal::DevicesError);
 impl_program_error!(cpal::DeviceNameError);
 impl_program_error!(tauri::Error);
+impl_program_error!(tauri_runtime::Error);
 impl_program_error!(cpal::DefaultStreamConfigError);
 impl_program_error!(cpal::BuildStreamError);
 impl_program_error!(cpal::PlayStreamError);
 impl_program_error!(hound::Error);
+impl_program_error!(rodio::PlayError);
+impl_program_error!(rodio::StreamError);
+impl_program_error!(rodio::decoder::DecoderError);
+impl_program_error!(Box<bincode::ErrorKind>);
 impl_program_error!(CommonError);

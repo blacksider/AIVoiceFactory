@@ -52,7 +52,6 @@ export class AutoTranslationComponent implements OnInit {
             debounceTime(500),
           )
           .subscribe(value => {
-            console.log('changed');
             this.service.saveAutoTranslationConfig(value).subscribe(() => {
             });
           });

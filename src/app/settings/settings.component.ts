@@ -14,7 +14,9 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   audioOutputs!: AudioSelection[];
   selectAudioOutput!: AudioSelection;
-  unListenChanges?: () => void;
+  audioInputs!: AudioSelection[];
+  selectAudioInput!: AudioSelection;
+  private unListenChanges?: () => void;
 
   constructor(private service: SettingsService,
               private activatedRoute: ActivatedRoute,
@@ -26,6 +28,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
       ({audioConfig}) => {
         this.audioConfig = audioConfig as AudioConfigResponseData;
         this.initAudioOutputs();
+        this.initAudioInputs();
       });
     listen('on_audio_config_change', this.updateAudioConfig.bind(this))
       .then((fn) => {
@@ -40,7 +43,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   private updateAudioConfig() {
-    console.log("changed", this);
     this.service.getAudioConfig().subscribe(config => {
       this.ngZone.run(() => {
         this.audioConfig = config;
@@ -69,11 +71,32 @@ export class SettingsComponent implements OnInit, OnDestroy {
     }
   }
 
+  private initAudioInputs(): void {
+    this.audioInputs = [new SelectDefault()];
+    if (this.audioConfig?.input_devices?.length > 0) {
+      this.audioConfig.input_devices.forEach(value => {
+        const selByName = new SelectByName();
+        selByName.name = value;
+        this.audioInputs.push(selByName)
+      });
+    }
+    this.selectAudioInput = this.audioInputs[0];
+    if (this.audioConfig?.config.output.type == 'ByName') {
+      const byName = this.audioConfig?.config.output as SelectByName;
+      for (let input of this.audioInputs) {
+        if (input instanceof SelectByName && input.name === byName.name) {
+          this.selectAudioInput = input;
+        }
+      }
+    }
+  }
+
   onChangeAudioOutput() {
     this.service.changeOutputDevice(this.selectAudioOutput)
       .subscribe(config => {
         this.audioConfig = config;
         this.initAudioOutputs();
+        this.initAudioInputs();
       });
   }
 

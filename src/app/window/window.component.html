@@ -20,8 +20,15 @@
           </nz-card>
         </nz-content>
         <nz-footer>
-          <div nz-row nzJustify="end">
-            <button nz-button nzType="primary" (click)="generate()">生成语音</button>
+          <div nz-row nzJustify="end" nzAlign="middle" nzGutter="10">
+            <div nz-col>
+              <label nz-checkbox id="syncOnTextRecognize" name="syncOnTextRecognize" [(ngModel)]="syncOnTextRecognize">
+                <span>同步语音识别</span>
+              </label>
+            </div>
+            <div nz-col>
+              <button nz-button nzType="primary" (click)="generate()">生成语音</button>
+            </div>
           </div>
         </nz-footer>
       </nz-layout>

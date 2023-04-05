@@ -1,8 +1,9 @@
 pub mod cmd {
-    use crate::config::{auto_translation, voice_engine};
+    use crate::config::{auto_translation, voice_engine, voice_recognition};
     use crate::config::auto_translation::AutoTranslationConfig;
     use crate::config::voice_engine::{VoiceEngineConfig, VoiceVoxEngineConfig};
-    use crate::controller::{audio_manager, generator};
+    use crate::config::voice_recognition::VoiceRecognitionConfig;
+    use crate::controller::{audio_manager, audio_recorder, generator};
     use crate::controller::audio_manager::{AudioConfigResponseData, AudioSelection};
     use crate::controller::generator::{AudioCacheDetail, AudioCacheIndex};
     use crate::controller::voice_engine::voice_vox;
@@ -34,6 +35,38 @@ pub mod cmd {
         let mut manager = auto_translation::AUTO_TRANS_CONFIG_MANAGER
             .lock().unwrap();
         Some(manager.save_config(config))
+    }
+
+    #[tauri::command]
+    pub fn get_voice_recognition_config() -> Option<VoiceRecognitionConfig> {
+        let manager = voice_recognition::VOICE_REC_CONFIG_MANAGER
+            .lock().unwrap();
+        Some(manager.get_config())
+    }
+
+    #[tauri::command]
+    pub fn save_voice_recognition_config(app_handle: tauri::AppHandle<tauri::Wry>, config: VoiceRecognitionConfig) -> Option<bool> {
+        // try to get original config to extract record_key
+        let old_config = voice_recognition::load_voice_recognition_config();
+        if old_config.is_err() {
+            log::error!("Unable to load current voice recognition config, err: {}", old_config.unwrap_err());
+            return Some(false);
+        }
+        let old_config = old_config.unwrap();
+
+        let mut manager = voice_recognition::VOICE_REC_CONFIG_MANAGER
+            .lock().unwrap();
+        let result = manager.save_config(config.clone());
+
+        // try to update shortcut by original key and new key
+        match audio_recorder::update_shortcut(&app_handle, &old_config, &config) {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to update shortcut, err: {}", err)
+            }
+        }
+
+        Some(result)
     }
 
     #[tauri::command]
@@ -170,5 +203,10 @@ pub mod cmd {
             }
         }
         None
+    }
+
+    #[tauri::command]
+    pub fn is_recorder_recording() -> bool {
+        audio_recorder::is_recording()
     }
 }

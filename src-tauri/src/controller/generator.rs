@@ -240,11 +240,9 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
     None
 }
 
-pub fn play_audio(index: String) -> Result<bool, Box<dyn Error>> {
-    let data_tree = DB_MANAGER.clone().db.open_tree(AUDIO_DATA_TREE_DATA)
-        .map_err(Box::new)?;
-    let cache = data_tree.get(index.into_bytes())
-        .map_err(Box::new)?;
+pub fn play_audio(index: String) -> Result<bool, ProgramError> {
+    let data_tree = DB_MANAGER.clone().db.open_tree(AUDIO_DATA_TREE_DATA)?;
+    let cache = data_tree.get(index.into_bytes())?;
     if let Some(encoded) = cache {
         let mutex = PLAY_MUTEX.clone();
         let playing = mutex.load(Ordering::Relaxed);
@@ -266,21 +264,21 @@ pub fn play_audio(index: String) -> Result<bool, Box<dyn Error>> {
     }
 }
 
-fn play_encoded_audio(encoded: &IVec) -> Result<(), Box<dyn Error>> {
-    let decoded: AudioCache = bincode::deserialize(&encoded)
-        .map_err(Box::new)?;
-    let wav_bytes = decoded.audio;
+fn play_wav_audio(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
     let cursor = Cursor::new(wav_bytes);
-    let source = Decoder::new(cursor)
-        .map_err(Box::new)?;
+    let source = Decoder::new(cursor)?;
     let output_device = audio_manager::get_output_device()?;
-    let (_stream, stream_handle) = OutputStream::try_from_device(&output_device)
-        .map_err(Box::new)?;
-    let sink = Sink::try_new(&stream_handle)
-        .map_err(Box::new)?;
+    let (_stream, stream_handle) = OutputStream::try_from_device(&output_device)?;
+    let sink = Sink::try_new(&stream_handle)?;
     sink.append(source);
     sink.play();
     sink.sleep_until_end();
     Ok(())
+}
+
+fn play_encoded_audio(encoded: &IVec) -> Result<(), ProgramError> {
+    let decoded: AudioCache = bincode::deserialize(&encoded)?;
+    let wav_bytes = decoded.audio;
+    play_wav_audio(wav_bytes)
 }
 

@@ -3,7 +3,6 @@ use std::sync::Mutex;
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use strum_macros::EnumString;
 
 use crate::config::config;
 use crate::controller::errors::ProgramError;
@@ -13,12 +12,6 @@ static SALT: &str = "1435660288";
 
 lazy_static! {
    pub static ref AUTO_TRANS_CONFIG_MANAGER: Mutex<AutoTranslationConfigManager> = Mutex::new(AutoTranslationConfigManager::init());
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumString, Serialize, Deserialize)]
-pub enum TranslatorType {
-    #[strum(serialize = "Baidu")]
-    Baidu,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -72,7 +65,7 @@ impl AutoTranslationConfig {
         if !self.enable {
             return (false, None);
         }
-        match self.tool {
+        return match self.tool {
             AutoTranslateTool::Baidu(config) => {
                 (true, Some(config))
             }

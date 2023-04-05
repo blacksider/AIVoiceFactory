@@ -1,8 +1,8 @@
 import {inject, Injectable} from '@angular/core';
 import {invoke} from '@tauri-apps/api';
-import {Observable, of, Subject, tap} from 'rxjs';
+import {Observable, of, tap} from 'rxjs';
 import {fromPromise} from 'rxjs/internal/observable/innerFrom';
-import {ActivatedRouteSnapshot, ResolveFn, RouterStateSnapshot} from '@angular/router';
+import {ResolveFn} from '@angular/router';
 import {VoiceEngineConfig} from './voice-engine';
 import {VoiceVoxSpeaker, VoiceVoxSpeakerInfo} from './voice-vox-engine/voice-vox';
 
@@ -11,8 +11,6 @@ import {VoiceVoxSpeaker, VoiceVoxSpeakerInfo} from './voice-vox-engine/voice-vox
 })
 export class VoiceEngineService {
   playingSample: string | null = null;
-
-  private loadInfoSubject = new Subject<string>();
   private speakerInfoCache = new Map<string, VoiceVoxSpeakerInfo>();
 
   constructor() {
@@ -44,6 +42,6 @@ export class VoiceEngineService {
 }
 
 export const voiceEngineConfigResolver: ResolveFn<VoiceEngineConfig> =
-  (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
+    () => {
     return inject(VoiceEngineService).getVoiceEngineConfig();
   };

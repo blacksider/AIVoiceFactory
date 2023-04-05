@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use reqwest::header::HeaderMap;
+use reqwest::StatusCode;
 
 use crate::config::voice_engine::VoiceVoxEngineConfig;
 use crate::controller::errors::{CommonError, ProgramError};
@@ -41,7 +42,7 @@ async fn audio_query(config: &VoiceVoxEngineConfig, text: String) -> Result<serd
         .query(&[("speaker", config.get_speaker().to_string()), ("text", text)])
         .send()
         .await?;
-    if res.status() == 200 {
+    if res.status() == StatusCode::OK {
         let res_json: serde_json::Value = res.json().await.map_err(ProgramError::from)?;
         Ok(res_json)
     } else {
@@ -63,7 +64,7 @@ async fn synthesis(config: &VoiceVoxEngineConfig, audio_data: serde_json::Value)
         .json(&audio_data)
         .send()
         .await?;
-    if res.status() == 200 {
+    if res.status() == StatusCode::OK {
         res.bytes().await.map_err(ProgramError::from)
     } else {
         Err(ProgramError::from(CommonError::from_http_error(res.status(), res.text().await?)))

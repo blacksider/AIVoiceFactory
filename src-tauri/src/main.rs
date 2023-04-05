@@ -1,9 +1,11 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+extern crate core;
+
 use tauri::{AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, Window, Wry};
 
-use crate::controller::{audio_manager, generator};
+use crate::controller::{audio_manager, audio_recorder, generator};
 
 mod logger;
 mod cypher;
@@ -74,6 +76,13 @@ fn main() {
                 generator::start_check_audio_caches();
             });
 
+            match audio_recorder::start_shortcut(&app.app_handle()) {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("Unable to start shortcut, err: {}", err);
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -81,6 +90,8 @@ fn main() {
             commands::mapping::cmd::save_voice_engine_config,
             commands::mapping::cmd::get_auto_translation_config,
             commands::mapping::cmd::save_auto_translation_config,
+            commands::mapping::cmd::get_voice_recognition_config,
+            commands::mapping::cmd::save_voice_recognition_config,
             commands::mapping::cmd::list_audios,
             commands::mapping::cmd::get_audio_detail,
             commands::mapping::cmd::play_audio,
@@ -89,6 +100,7 @@ fn main() {
             commands::mapping::cmd::get_voice_vox_speakers,
             commands::mapping::cmd::get_voice_vox_speaker_info,
             commands::mapping::cmd::change_output_device,
+            commands::mapping::cmd::is_recorder_recording,
         ])
         .system_tray(create_system_tray())
         .on_system_tray_event(handle_system_tray_event)

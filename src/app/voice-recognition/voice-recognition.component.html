@@ -1,0 +1,39 @@
+<form nz-form [formGroup]="configForm">
+  <nz-form-item nz-row class="register-area">
+    <nz-form-control [nzSpan]="24">
+      <label nz-checkbox id="enable" name="enable" formControlName="enable">
+        <span>启用</span>
+      </label>
+    </nz-form-control>
+  </nz-form-item>
+  <nz-form-item *ngIf="enable.value === true">
+    <nz-form-label [nzSpan]="24" nzFor="recordKey">录音快捷键</nz-form-label>
+    <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+      <app-key-recorder id="recordKey" name="recordKey" formControlName="recordKey"></app-key-recorder>
+    </nz-form-control>
+  </nz-form-item>
+  <ng-container *ngIf="enable.value === true" formGroupName="tool">
+    <nz-form-item>
+      <nz-form-label [nzSpan]="24" nzFor="type">翻译器</nz-form-label>
+      <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+        <nz-select id="type" name="type"
+                   formControlName="type">
+          <nz-option *ngFor="let type of recognizers"
+                     [nzValue]="type"
+                     [nzLabel]="recognizerTypes[type].name"></nz-option>
+        </nz-select>
+      </nz-form-control>
+    </nz-form-item>
+    <div *ngIf="type.value === recognizerTypes['Whisper'].type">
+      <nz-divider nzType="horizontal"></nz-divider>
+      <h4>Whisper</h4>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzFor="apiAddr">地址</nz-form-label>
+        <nz-form-control nzMd="12" nzXs="24">
+          <input id="apiAddr" name="apiAddr" nz-input
+                 formControlName="apiAddr"/>
+        </nz-form-control>
+      </nz-form-item>
+    </div>
+  </ng-container>
+</form>

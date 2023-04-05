@@ -8,6 +8,9 @@ import {SettingsComponent} from './settings/settings.component';
 import {voiceEngineConfigResolver} from './voice-engine/voice-engine.service';
 import {autoTranslationConfigResolver} from './auto-translation/auto-translation.service';
 import {audioConfigResolver} from './settings/settings.service';
+import {VoiceRecognitionComponent} from "./voice-recognition/voice-recognition.component";
+import {voiceRecognitionConfigResolver} from "./voice-recognition/voice-recognition.service";
+import {RecordingPopupComponent} from "./recording-popup/recording-popup.component";
 
 const routes: Routes = [
   {
@@ -20,6 +23,13 @@ const routes: Routes = [
         component: VoiceEngineComponent,
         resolve: {
           config: voiceEngineConfigResolver
+        }
+      },
+      {
+        path: 'voice-rec',
+        component: VoiceRecognitionComponent,
+        resolve: {
+          config: voiceRecognitionConfigResolver
         }
       },
       {
@@ -37,6 +47,10 @@ const routes: Routes = [
         }
       }
     ]
+  },
+  {
+    path: 'recording',
+    component: RecordingPopupComponent
   }
 ];
 

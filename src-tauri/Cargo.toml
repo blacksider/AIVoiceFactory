@@ -1,8 +1,8 @@
 [package]
 name = "ai_voice_factory"
 version = "1.0.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "AI voice factory for various kind of voice functionalities"
+authors = ["github.com/blacksider"]
 license = ""
 repository = ""
 edition = "2021"
@@ -13,7 +13,8 @@ edition = "2021"
 tauri-build = { version = "1.2", features = [] }
 
 [dependencies]
-tauri = { version = "1.2", features = ["shell-open", "system-tray"] }
+tauri = { version = "1.2", features = ["global-shortcut-all", "shell-open", "system-tray"] }
+tauri-runtime = "0.12.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4.17"
@@ -29,7 +30,8 @@ strum = "0.24.1"
 strum_macros = "0.24.3"
 lazy_static = "1.4.0"
 bytes = "1.4.0"
-reqwest = { version = "0.11.15", features = ["json"] }
+tokio = { version = "1.26.0", features = ["rt-multi-thread", "macros"] }
+reqwest = { version = "0.11.15", features = ["json", "multipart"] }
 wav = "1.0.0"
 chrono = "0.4.24"
 cpal = "0.15.1"

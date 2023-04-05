@@ -5,3 +5,5 @@ pub mod translators;
 pub mod errors;
 pub mod audio_manager;
 pub mod audio_recorder;
+pub mod voice_recognition;
+pub mod recognizer;

@@ -1,0 +1,6 @@
+<nz-input-group [nzSuffix]="suffixTemplate" [nzStatus]="editing ? 'error' : ''">
+  <div class="keys">{{keys}}</div>
+</nz-input-group>
+<ng-template #suffixTemplate>
+  <button nz-button nzType="default" (click)="toEdit()" [nzDanger]="editing">{{editing ? '确认' : '编辑'}}</button>
+</ng-template>
