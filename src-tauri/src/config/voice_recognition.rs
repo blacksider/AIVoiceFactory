@@ -15,6 +15,7 @@ lazy_static! {
 pub struct RecognizeByWhisper {
     #[serde(rename = "apiAddr")]
     pub(crate) api_addr: String,
+    pub(crate) language: Option<String>
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -52,6 +53,7 @@ fn gen_default_config() -> Result<VoiceRecognitionConfig, ProgramError> {
         record_key: "Ctrl+P".to_string(),
         tool: RecognitionTool::Whisper(RecognizeByWhisper {
             api_addr: empty_str.clone(),
+            language: None
         }),
     };
     config::save_config(RECOGNITION_CONFIG, &default_config)?;

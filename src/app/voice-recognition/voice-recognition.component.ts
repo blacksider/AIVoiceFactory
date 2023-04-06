@@ -4,6 +4,7 @@ import {RecognizeByWhisper, RecognizerTypes, VoiceRecognitionConfig} from "./voi
 import {ActivatedRoute} from "@angular/router";
 import {VoiceRecognitionService} from "./voice-recognition.service";
 import {debounceTime, filter} from "rxjs";
+import {WhisperLanguages} from "./whisper_languages";
 
 @Component({
   selector: 'app-voice-recognition',
@@ -14,6 +15,9 @@ export class VoiceRecognitionComponent implements OnInit {
   recognizerTypes = RecognizerTypes;
   recognizers= Object.keys(RecognizerTypes);
   configForm!: FormGroup;
+
+  whisperLanguages: { [key: string]: string } = {};
+  whisperLanguageTypes: string[] = [];
 
   constructor(private activatedRoute: ActivatedRoute,
               private service: VoiceRecognitionService,
@@ -33,9 +37,14 @@ export class VoiceRecognitionComponent implements OnInit {
 
           if (configData.tool.type === RecognizerTypes['Whisper'].type) {
             const recognizeByWhisper = configData.tool as RecognizeByWhisper;
+            // translate null to auto
+            if (recognizeByWhisper.language === null) {
+              recognizeByWhisper.language = 'auto';
+            }
             this.configForm.addControl('tool', this.fb.group({
               type: [recognizeByWhisper.type],
               apiAddr: [recognizeByWhisper.apiAddr],
+              language: [recognizeByWhisper.language]
             }));
           }
 
@@ -44,12 +53,21 @@ export class VoiceRecognitionComponent implements OnInit {
                   filter(() => this.configForm.valid),
                   debounceTime(500),
               )
-              .subscribe(value => {
-                console.log(value);
+            .subscribe(value => {
+                if (value.tool.type === RecognizerTypes['Whisper'].type) {
+                  // translate auto to null
+                  if (value.tool.language === 'auto') {
+                    value.tool.language = null;
+                  }
+                }
                 this.service.saveVoiceRecognitionConfig(value).subscribe(() => {
                 });
               });
         });
+    WhisperLanguages.forEach((value, index) => {
+      this.whisperLanguages[value.key] = value.name;
+      this.whisperLanguageTypes.push(value.key);
+    });
   }
 
   get enable(): FormControl {

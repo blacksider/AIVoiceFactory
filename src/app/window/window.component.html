@@ -35,31 +35,40 @@
         </nz-footer>
       </nz-layout>
     </nz-sider>
-    <nz-content>
+    <nz-content class="monitor-content">
       <nz-card [nzBordered]="false" nzTitle="监控" nzSize="small"
                class="main-card"
-               [nzBodyStyle]="{flex: '1 1 auto'}">
-        <nz-collapse nzAccordion>
+               [nzBodyStyle]="{flex: '1 1 auto', overflowY: 'auto'}"
+               [nzExtra]="monitorExtra">
+        <ng-template #monitorExtra>
+          <button type="button" nz-button nzSize="small" (click)="collapseAudios(true)">折叠所有</button>
+          <button type="button" nz-button nzSize="small" class="space-left" (click)="collapseAudios(false)">展开所有</button>
+        </ng-template>
+        <nz-collapse>
           <nz-collapse-panel *ngFor="let item of audios"
-                             nzHeader="{{item.time | date: 'yyyy-MM-dd HH:mm:ss'}}: {{item.name}}"
+                             nzHeader="{{item.name}}  {{item.time | date: 'dd/MM/yy HH:mm'}}"
                              [nzExtra]="itemExtra"
+                             [nzActive]="item.active"
                              (nzActiveChange)="onExpandItem($event, item)">
             <ng-template #itemExtra>
-              <div (click)="$event.stopPropagation();">
-                <span nz-icon nzType="play-circle" nzTheme="outline"
-                      class="play-audio"
-                      (click)="playAudio(item.name)" i></span>
-              </div>
+            <span (click)="$event.stopPropagation();">
+              <span nz-icon nzType="play-circle" nzTheme="outline"
+                    class="play-audio"
+                    (click)="playAudio(item.name)"></span>
+            </span>
+              <span (click)="$event.stopPropagation();" class="space-left">
+              <span nz-icon nzType="delete" nzTheme="outline"
+                    class="delete"
+                    (click)="removeAudio(item)"></span>
+            </span>
             </ng-template>
             <div *ngIf="audioDetails[item.name]; else loading">
-              <nz-table [nzTemplateMode]="true">
+              <nz-table [nzTemplateMode]="true" nzSize="small">
                 <tbody>
                 <tr>
                   <td style="width: 90px">源内容：</td>
                   <td>{{audioDetails[item.name].source}}</td>
-                </tr>
-                <tr>
-                  <td>处理后：</td>
+                  <td style="width: 90px">处理后：</td>
                   <td>{{audioDetails[item.name].translated}}</td>
                 </tr>
                 </tbody>

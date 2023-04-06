@@ -3,6 +3,11 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
+
+  .ant-card-body {
+    height: 100%;
+    overflow: auto;
+  }
 }
 
 nz-footer {
@@ -28,6 +33,10 @@ nz-content {
   height: 100%;
   padding: 0 10px 10px 0;
   background: #fff;
+}
+
+.monitor-content {
+  height: 100%;
 }
 
 nz-content > div {
@@ -60,4 +69,17 @@ nz-header,
 .play-audio {
   color: #1fa679;
   cursor: pointer;
+
+  &:hover {
+    color: lighten(#1fa679, 20%);
+  }
+}
+
+.delete {
+  color: #d03f57;
+  cursor: pointer;
+
+  &:hover {
+    color: lighten(#d03f57, 20%);
+  }
 }

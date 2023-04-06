@@ -1,9 +1,10 @@
 import {Component, OnInit} from '@angular/core';
-import {AutoTranslationConfig, BaiduLanguages, TranslateByBaidu, Translator, TranslatorTypes} from './auto-translation';
+import {AutoTranslationConfig, TranslateByBaidu, Translator, TranslatorTypes} from './auto-translation';
 import {ActivatedRoute} from '@angular/router';
 import {AutoTranslationService} from './auto-translation.service';
 import {FormBuilder, FormControl, FormGroup} from '@angular/forms';
 import {debounceTime, filter} from 'rxjs';
+import {BaiduLanguages} from "./baidu_languages";
 
 @Component({
   selector: 'app-auto-translation',

@@ -98,6 +98,20 @@ pub mod cmd {
     }
 
     #[tauri::command]
+    pub fn delete_audio(index: String) -> Option<bool> {
+        match generator::delete_index(index) {
+            Ok(_) => {
+                return Some(true);
+            }
+            Err(err) => {
+                log::error!("Cannot delete audio cache, err: {}", err)
+            }
+        }
+        None
+    }
+
+
+    #[tauri::command]
     pub fn play_audio(index: String) -> Option<bool> {
         match generator::play_audio(index) {
             Ok(data) => {

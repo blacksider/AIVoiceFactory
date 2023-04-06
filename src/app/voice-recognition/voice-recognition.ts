@@ -24,6 +24,7 @@ export const RecognizerTypes: { [key: string]: Recognizer } = {
 
 export class RecognizeByWhisper extends RecognitionTool {
     apiAddr!: string;
+    language?: string | null;
 
     constructor() {
         super();

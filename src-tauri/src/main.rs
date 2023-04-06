@@ -58,16 +58,18 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             log::info!("Application started");
-            // FIXME Setup window location to the right side of the screent
-            // This is just for local testing, will be removed in the future
             let window: Window<Wry> = app.get_window("main").ok_or("Main window not found")?;
-            let window_width = window.outer_size()?.width;
-            let screen = window.current_monitor()?.ok_or("Monitor info not found")?;
-            let screen_width = screen.size().width;
-            let window_x = screen_width - window_width;
-            let window_y = 100;
-            window.set_position(tauri::PhysicalPosition { x: window_x, y: window_y })?;
-            // -------------------------------------------------------------
+
+            // if at dev mode, set window to the right side of current monitor
+            if cfg!(debug_assertions) {
+                log::debug!("Running at dev mode");
+                let window_width = window.outer_size()?.width;
+                let screen = window.current_monitor()?.ok_or("Monitor info not found")?;
+                let screen_width = screen.size().width;
+                let window_x = screen_width - window_width;
+                let window_y = 100;
+                window.set_position(tauri::PhysicalPosition { x: window_x, y: window_y })?;
+            }
 
             tauri::async_runtime::spawn(async {
                 audio_manager::watch_audio_devices(window);
@@ -94,6 +96,7 @@ fn main() {
             commands::mapping::cmd::save_voice_recognition_config,
             commands::mapping::cmd::list_audios,
             commands::mapping::cmd::get_audio_detail,
+            commands::mapping::cmd::delete_audio,
             commands::mapping::cmd::play_audio,
             commands::mapping::cmd::generate_audio,
             commands::mapping::cmd::get_audio_config,

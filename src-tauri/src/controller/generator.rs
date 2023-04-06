@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::io::Cursor;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,7 +13,7 @@ use sled::transaction::ConflictableTransactionError;
 use crate::config::config::DB_MANAGER;
 use crate::config::voice_engine;
 use crate::controller::{audio_manager, translator};
-use crate::controller::errors::{CommonError, ProgramError};
+use crate::controller::errors::ProgramError;
 use crate::controller::voice_engine::voice_vox;
 
 static AUDIO_DATA_TREE_INDEX: &str = "tree_index";
@@ -110,10 +109,9 @@ impl From<AudioCache> for AudioCacheDetail {
     }
 }
 
-pub fn list_indices() -> Result<Vec<AudioCacheIndex>, Box<dyn Error>> {
+pub fn list_indices() -> Result<Vec<AudioCacheIndex>, ProgramError> {
     let index_tree = DB_MANAGER.clone().db
-        .open_tree(AUDIO_DATA_TREE_INDEX)
-        .map_err(Box::new)?;
+        .open_tree(AUDIO_DATA_TREE_INDEX)?;
     let from = if index_tree.len() > MAX_DATA_SIZE { index_tree.len() - MAX_DATA_SIZE } else { 0 };
     let keys: Vec<Vec<u8>> = index_tree
         .iter()
@@ -125,31 +123,42 @@ pub fn list_indices() -> Result<Vec<AudioCacheIndex>, Box<dyn Error>> {
 
     let mut result = vec![];
     for key in keys {
-        let cache = index_tree.get(key).map_err(Box::new)?;
+        let cache = index_tree.get(key)?;
         if let Some(encoded) = cache {
-            let decoded: AudioCacheIndex = bincode::deserialize(&encoded)
-                .map_err(Box::new)?;
+            let decoded: AudioCacheIndex = bincode::deserialize(&encoded)?;
             result.push(decoded);
         }
     }
     Ok(result)
 }
 
-pub fn get_index_detail(index: String) -> Result<AudioCacheDetail, Box<dyn Error>> {
+pub fn get_index_detail(index: String) -> Result<AudioCacheDetail, ProgramError> {
     let data_tree = DB_MANAGER.clone().db
-        .open_tree(AUDIO_DATA_TREE_DATA)
-        .map_err(Box::new)?;
-    let cache = data_tree.get(index.clone().into_bytes()).map_err(Box::new)?;
+        .open_tree(AUDIO_DATA_TREE_DATA)?;
+    let cache = data_tree.get(index.clone().into_bytes())?;
     if let Some(encoded) = cache {
-        let decoded: AudioCache = bincode::deserialize(&encoded)
-            .map_err(Box::new)?;
+        let decoded: AudioCache = bincode::deserialize(&encoded)?;
         Ok(AudioCacheDetail::from(decoded))
     } else {
-        Err(Box::new(CommonError::new(format!("No such record of index {}", index.clone()))))
+        Err(ProgramError::from(format!("No such record of index {}", index.clone())))
     }
 }
 
-fn save_audio(source: String, translated: String, audio: Bytes) -> Result<AudioCacheIndex, Box<dyn Error>> {
+pub fn delete_index(index: String) -> Result<(), ProgramError> {
+    let index_tree = DB_MANAGER.clone().db
+        .open_tree(AUDIO_DATA_TREE_INDEX)?;
+    let data_tree = DB_MANAGER.clone().db
+        .open_tree(AUDIO_DATA_TREE_DATA)?;
+    (&index_tree, &data_tree)
+        .transaction(|(tx_index_tree, tx_data_tree)| {
+            tx_index_tree.remove(&*index)?;
+            tx_data_tree.remove(&*index)?;
+            Ok::<(), ConflictableTransactionError<>>(())
+        })?;
+    Ok(())
+}
+
+fn save_audio(source: String, translated: String, audio: Bytes) -> Result<AudioCacheIndex, ProgramError> {
     let index_name = new_index_name();
     log::debug!("Save audio cache with index: {}", index_name);
     let time: DateTime<Utc> = Utc::now();
@@ -166,16 +175,12 @@ fn save_audio(source: String, translated: String, audio: Bytes) -> Result<AudioC
     };
 
     let index_tree = DB_MANAGER.clone().db
-        .open_tree(AUDIO_DATA_TREE_INDEX)
-        .map_err(Box::new)?;
+        .open_tree(AUDIO_DATA_TREE_INDEX)?;
     let data_tree = DB_MANAGER.clone().db
-        .open_tree(AUDIO_DATA_TREE_DATA)
-        .map_err(Box::new)?;
+        .open_tree(AUDIO_DATA_TREE_DATA)?;
 
-    let encoded_index = bincode::serialize(&cache_index)
-        .map_err(Box::new)?;
-    let encoded_data = bincode::serialize(&cache_data)
-        .map_err(Box::new)?;
+    let encoded_index = bincode::serialize(&cache_index)?;
+    let encoded_data = bincode::serialize(&cache_data)?;
 
     (&index_tree, &data_tree)
         .transaction(|(tx_index_tree, tx_data_tree)| {

@@ -9,6 +9,7 @@ import {VoiceRecognitionConfig} from "./voice-recognition";
   providedIn: 'root'
 })
 export class VoiceRecognitionService {
+
   constructor() {
   }
 

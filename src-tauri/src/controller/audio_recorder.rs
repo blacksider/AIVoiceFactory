@@ -1,12 +1,11 @@
 use std::io::Cursor;
-use std::sync::{Arc, mpsc, Mutex};
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use cpal::{Stream, SupportedStreamConfig};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use lazy_static::lazy_static;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, Window, WindowBuilder, WindowUrl, Wry};
-use tauri_runtime::menu::Menu;
 
 use crate::config::voice_recognition;
 use crate::config::voice_recognition::VoiceRecognitionConfig;
@@ -288,14 +287,14 @@ pub async fn check_recorder(handle: AppHandle<Wry>) -> Result<String, ProgramErr
     Ok("".to_string())
 }
 
-async fn check_recorder_async(sender: mpsc::Sender<String>, handle: AppHandle<Wry>) -> Result<(), ProgramError> {
-    match check_recorder(handle).await {
+async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError> {
+    match check_recorder(handle.app_handle()).await {
         Ok(text) => {
-            match sender.send(text) {
-                Ok(_) => {}
-                Err(err) => {
-                    log::error!("Failed to send checked result back, err: {}", err);
-                }
+            if !text.is_empty() {
+                log::debug!("Handle recorded text: {}", text);
+                handle.get_window("main").unwrap()
+                    .emit("on_audio_recognize_text", text)
+                    .unwrap();
             }
             Ok(())
         }
@@ -306,31 +305,15 @@ async fn check_recorder_async(sender: mpsc::Sender<String>, handle: AppHandle<Wr
 }
 
 fn recorder_handler(app: AppHandle<Wry>) {
-    let (tx, rx) = mpsc::channel();
-    let sender = Arc::new(Mutex::new(tx));
-
     let app_handle = Box::new(app.clone());
     tauri::async_runtime::spawn(async move {
-        let sender = sender.clone().lock().unwrap().clone();
-        match check_recorder_async(sender, app_handle.app_handle()).await {
+        match check_recorder_async( app_handle.app_handle()).await {
             Ok(_) => {}
             Err(err) => {
                 log::error!("Unable to check recorder, err: {}", err)
             }
         };
     });
-    let text = rx.recv();
-
-    match text {
-        Ok(text) => {
-            app.get_window("main").unwrap()
-                .emit("on_audio_recognize_text", text)
-                .unwrap();
-        }
-        Err(err) => {
-            log::error!("Failed to receive checked result, err: {}", err);
-        }
-    }
 }
 
 pub fn start_shortcut(app: &AppHandle<Wry>) -> Result<(), ProgramError> {

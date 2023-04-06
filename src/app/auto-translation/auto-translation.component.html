@@ -46,7 +46,8 @@
         <nz-form-label [nzSpan]="24" nzFor="from">源语言</nz-form-label>
         <nz-form-control nzMd="6" nzSm="12" nzXs="24">
           <nz-select id="from" name="from"
-                     formControlName="from">
+                     formControlName="from"
+                     [nzShowSearch]="true">
             <nz-option *ngFor="let from of baiduFromLanguageTypes"
                        [nzValue]="from"
                        [nzLabel]="baiduLanguages[from]"></nz-option>
@@ -57,7 +58,8 @@
         <nz-form-label [nzSpan]="24" nzFor="from">目标语言</nz-form-label>
         <nz-form-control nzMd="6" nzSm="12" nzXs="24">
           <nz-select id="to" name="to"
-                     formControlName="to">
+                     formControlName="to"
+                     [nzShowSearch]="true">
             <nz-option *ngFor="let to of baiduToLanguageTypes"
                        [nzValue]="to"
                        [nzLabel]="baiduLanguages[to]"></nz-option>

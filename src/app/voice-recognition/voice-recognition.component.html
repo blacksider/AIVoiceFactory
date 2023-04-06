@@ -34,6 +34,18 @@
                  formControlName="apiAddr"/>
         </nz-form-control>
       </nz-form-item>
+      <nz-form-item>
+        <nz-form-label [nzSpan]="24" nzFor="from">语言</nz-form-label>
+        <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+          <nz-select id="language" name="language"
+                     formControlName="language"
+                     [nzShowSearch]="true">
+            <nz-option *ngFor="let lan of whisperLanguageTypes"
+                       [nzValue]="lan"
+                       [nzLabel]="whisperLanguages[lan]"></nz-option>
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
     </div>
   </ng-container>
 </form>

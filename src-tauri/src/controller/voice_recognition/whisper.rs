@@ -19,9 +19,17 @@ pub async fn asr(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, P
     let form = Form::new()
         .part("audio_file", Part::bytes(data).file_name("asr.wav"));
 
+    let mut query = vec![("task", REQ_TASK), ("output", REQ_OUTPUT)];
+    let language;
+    if config.language.is_some() {
+        language = config.language.clone().unwrap();
+        query.push(("language", &*language))
+    }
+
+    let query = query;
     let res: reqwest::Response = client
         .post(format!("{}/asr", config.api_addr))
-        .query(&[("task", REQ_TASK), ("output", REQ_OUTPUT)])
+        .query(&query)
         .multipart(form)
         .send()
         .await?;
