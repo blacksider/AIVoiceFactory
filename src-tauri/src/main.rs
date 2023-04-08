@@ -13,6 +13,7 @@ mod config;
 mod commands;
 mod controller;
 mod utils;
+mod asio;
 
 fn create_system_tray() -> SystemTray {
     let quit = CustomMenuItem::new("exit".to_string(), "Exit");
