@@ -39,7 +39,7 @@ export class AutoTranslationComponent implements OnInit {
           const translateByBaidu = configData.tool as TranslateByBaidu;
           this.configForm.addControl('tool', this.fb.group({
             type: [translateByBaidu.type],
-            apiAddr: [translateByBaidu.apiAddr],
+            api_addr: [translateByBaidu.api_addr],
             appId: [translateByBaidu.appId],
             secret: [translateByBaidu.secret],
             from: [translateByBaidu.from],

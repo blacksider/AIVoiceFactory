@@ -22,7 +22,7 @@ export const TranslatorTypes: { [key: string]: Translator } = {
 };
 
 export class TranslateByBaidu extends AutoTranslateTool {
-  apiAddr!: string;
+  api_addr!: string;
   appId!: string;
   secret!: string;
   from!: string;

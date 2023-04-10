@@ -13,7 +13,6 @@ lazy_static! {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RecognizeByWhisper {
-    #[serde(rename = "apiAddr")]
     pub(crate) api_addr: String,
     pub(crate) language: Option<String>
 }

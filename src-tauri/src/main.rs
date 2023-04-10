@@ -5,6 +5,7 @@ extern crate core;
 
 use tauri::{AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, Window, Wry};
 
+use crate::config::voice_engine;
 use crate::controller::{audio_manager, audio_recorder, generator};
 
 mod logger;
@@ -77,6 +78,8 @@ fn main() {
             tauri::async_runtime::spawn(async {
                 generator::start_check_audio_caches();
             });
+
+            voice_engine::check_voicevox();
 
             match audio_recorder::start_shortcut(&app.app_handle()) {
                 Ok(_) => {}

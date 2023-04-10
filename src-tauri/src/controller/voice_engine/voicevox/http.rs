@@ -4,38 +4,10 @@ use reqwest::StatusCode;
 
 use crate::config::voice_engine::VoiceVoxEngineConfig;
 use crate::controller::errors::{CommonError, ProgramError};
+use crate::controller::voice_engine::voicevox::model::{VoiceVoxSpeaker, VoiceVoxSpeakerInfo};
 use crate::utils;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct VoiceVoxSpeakerStyle {
-    id: i32,
-    name: String,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct VoiceVoxSpeaker {
-    name: String,
-    speaker_uuid: String,
-    version: String,
-    styles: Vec<VoiceVoxSpeakerStyle>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct VoiceVoxSpeakerStyleInfo {
-    id: i32,
-    icon: String,
-    portrait: Option<String>,
-    voice_samples: Vec<String>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct VoiceVoxSpeakerInfo {
-    policy: String,
-    portrait: String,
-    style_infos: Vec<VoiceVoxSpeakerStyleInfo>,
-}
-
-async fn audio_query(config: &VoiceVoxEngineConfig, text: String) -> Result<serde_json::Value, ProgramError> {
+pub async fn audio_query(config: &VoiceVoxEngineConfig, text: String) -> Result<serde_json::Value, ProgramError> {
     let client = reqwest::Client::new();
     let res: reqwest::Response = client
         .post(format!("{}/audio_query", config.build_api()))
@@ -50,7 +22,7 @@ async fn audio_query(config: &VoiceVoxEngineConfig, text: String) -> Result<serd
     }
 }
 
-async fn synthesis(config: &VoiceVoxEngineConfig, audio_data: serde_json::Value) -> Result<Bytes, ProgramError> {
+pub async fn synthesis(config: &VoiceVoxEngineConfig, audio_data: serde_json::Value) -> Result<Bytes, ProgramError> {
     let mut headers = HeaderMap::new();
 
     headers.insert("Content-Type", "application/json".parse().unwrap());
@@ -71,11 +43,6 @@ async fn synthesis(config: &VoiceVoxEngineConfig, audio_data: serde_json::Value)
     }
 }
 
-pub async fn gen_audio(config: &VoiceVoxEngineConfig, text: String) -> Result<Bytes, ProgramError> {
-    let data = audio_query(config, text).await?;
-    let audio = synthesis(config, data).await?;
-    Ok(audio)
-}
 
 pub async fn speakers(config: &VoiceVoxEngineConfig) -> Result<Vec<VoiceVoxSpeaker>, ProgramError> {
     utils::http::get_json(format!("{}/speakers", config.build_api())).await

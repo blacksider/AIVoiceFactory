@@ -6,8 +6,8 @@ pub mod cmd {
     use crate::controller::{audio_manager, audio_recorder, generator};
     use crate::controller::audio_manager::{AudioConfigResponseData, AudioSelection};
     use crate::controller::generator::{AudioCacheDetail, AudioCacheIndex};
-    use crate::controller::voice_engine::voice_vox;
-    use crate::controller::voice_engine::voice_vox::{VoiceVoxSpeaker, VoiceVoxSpeakerInfo};
+    use crate::controller::voice_engine::voicevox;
+    use crate::controller::voice_engine::voicevox::model::{VoiceVoxSpeaker, VoiceVoxSpeakerInfo};
 
     #[tauri::command]
     pub fn get_voice_engine_config() -> Option<VoiceEngineConfig> {
@@ -21,6 +21,11 @@ pub mod cmd {
         let mut manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER
             .lock().unwrap();
         Some(manager.save_config(config))
+    }
+
+    #[tauri::command]
+    pub async fn is_downloading_voicevox_bin() -> bool {
+        voicevox::is_downloading().await
     }
 
     #[tauri::command]
@@ -180,7 +185,7 @@ pub mod cmd {
         if config.is_none() {
             return None;
         }
-        let result = voice_vox::speakers(&config.unwrap()).await;
+        let result = voicevox::speakers(&config.unwrap()).await;
         match result {
             Ok(res) => Some(res),
             Err(err) => {
@@ -196,7 +201,7 @@ pub mod cmd {
         if config.is_none() {
             return None;
         }
-        let result = voice_vox::speaker_info(&config.unwrap(), speaker_uuid).await;
+        let result = voicevox::speaker_info(&config.unwrap(), speaker_uuid).await;
         match result {
             Ok(res) => Some(res),
             Err(err) => {

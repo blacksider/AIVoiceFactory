@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 
 use crate::config::config;
 use crate::controller::errors::ProgramError;
+use crate::controller::voice_engine::voicevox::{check_and_load, check_and_unload};
 
 static VOICE_ENGINE_CONFIG: &str = "voice_engine";
 
@@ -18,21 +19,39 @@ pub enum EngineType {
     VoiceVox,
 }
 
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]
+pub enum VoiceVoxConfigType {
+    #[strum(serialize = "http")]
+    Http,
+    #[strum(serialize = "binary")]
+    Binary,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct VoiceVoxEngineConfig {
-    protocol: String,
-    #[serde(rename = "apiAddr")]
-    api_addr: String,
-    speaker_uuid: String,
-    speaker_style_id: i32,
+    pub(crate) config_type: VoiceVoxConfigType,
+    // by http
+    pub(crate) protocol: String,
+    pub(crate) api_addr: String,
+    // by binary
+    pub(crate) device: String,
+    pub(crate) cpu_arch: Option<String>,
+    // speaker info
+    pub(crate) speaker_uuid: String,
+    pub(crate) speaker_style_id: u32,
 }
+
+unsafe impl Send for VoiceVoxEngineConfig {}
+
+unsafe impl Sync for VoiceVoxEngineConfig {}
 
 impl VoiceVoxEngineConfig {
     pub fn build_api(&self) -> String {
         format!("{}://{}", self.protocol, self.api_addr)
     }
 
-    pub fn get_speaker(&self) -> i32 {
+    pub fn get_speaker(&self) -> u32 {
         self.speaker_style_id
     }
 }
@@ -66,8 +85,11 @@ fn gen_default_config() -> Result<VoiceEngineConfig, ProgramError> {
     let default_config = VoiceEngineConfig {
         engine_type: EngineType::VoiceVox,
         config: EngineConfig::VoiceVox(VoiceVoxEngineConfig {
+            config_type: VoiceVoxConfigType::Http,
             protocol: "http".to_string(),
             api_addr: String::new(),
+            device: "cpu".to_string(),
+            cpu_arch: None,
             speaker_uuid: "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff".to_string(),
             speaker_style_id: 0,
         }),
@@ -94,6 +116,12 @@ fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ProgramErr
     config::save_config(VOICE_ENGINE_CONFIG, config)
 }
 
+pub fn check_voicevox() {
+    log::debug!("Check voice engine voicevox config");
+    let manager = VOICE_ENGINE_CONFIG_MANAGER.lock().unwrap();
+    manager.check_voice_vox();
+}
+
 #[derive(Debug)]
 pub struct VoiceEngineConfigManager {
     config: VoiceEngineConfig,
@@ -103,7 +131,9 @@ impl VoiceEngineConfigManager {
     pub fn init() -> Self {
         let config = load_voice_engine_config();
         match config {
-            Ok(data) => VoiceEngineConfigManager { config: data },
+            Ok(data) => {
+                VoiceEngineConfigManager { config: data }
+            }
             Err(err) => {
                 log::error!("Failed to init voice engine config manager, load config with error: {}", err);
                 panic!("Unable to init voice engine config manager");
@@ -115,11 +145,26 @@ impl VoiceEngineConfigManager {
         self.config.clone()
     }
 
+    pub fn check_voice_vox(&self) {
+        if self.config.is_voice_vox_config() {
+            let config = self.config.get_voice_vox_config();
+            match config.config_type {
+                VoiceVoxConfigType::Binary => {
+                    check_and_load(config);
+                }
+                _ => {
+                    check_and_unload();
+                }
+            }
+        }
+    }
+
     pub fn save_config(&mut self, config: VoiceEngineConfig) -> bool {
         let result = save_voice_engine_config(&config);
         match result {
             Ok(_) => {
                 self.config = config;
+                self.check_voice_vox();
                 true
             }
             Err(err) => {
@@ -141,8 +186,11 @@ mod tests {
         let config = VoiceEngineConfig {
             engine_type: EngineType::VoiceVox,
             config: EngineConfig::VoiceVox(VoiceVoxEngineConfig {
+                config_type: VoiceVoxConfigType::Http,
                 protocol: protocol.clone(),
                 api_addr: api_addr.clone(),
+                device: "".to_string(),
+                cpu_arch: None,
                 speaker_uuid: "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff".to_string(),
                 speaker_style_id: 0,
             }),

@@ -43,7 +43,7 @@ export class VoiceRecognitionComponent implements OnInit {
             }
             this.configForm.addControl('tool', this.fb.group({
               type: [recognizeByWhisper.type],
-              apiAddr: [recognizeByWhisper.apiAddr],
+              api_addr: [recognizeByWhisper.api_addr],
               language: [recognizeByWhisper.language]
             }));
           }

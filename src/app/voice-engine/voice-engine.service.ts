@@ -39,6 +39,10 @@ export class VoiceEngineService {
         })
       );
   }
+
+  isDownloadVoicevoxBin(): Observable<boolean> {
+    return fromPromise<boolean>(invoke<boolean>('is_downloading_voicevox_bin'));
+  }
 }
 
 export const voiceEngineConfigResolver: ResolveFn<VoiceEngineConfig> =

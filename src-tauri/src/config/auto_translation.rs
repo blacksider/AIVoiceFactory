@@ -22,7 +22,6 @@ enum AutoTranslateTool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateByBaidu {
-    #[serde(rename = "apiAddr")]
     api_addr: String,
     #[serde(rename = "appId")]
     app_id: String,

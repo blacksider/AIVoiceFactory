@@ -14,7 +14,7 @@ use crate::config::config::DB_MANAGER;
 use crate::config::voice_engine;
 use crate::controller::{audio_manager, translator};
 use crate::controller::errors::ProgramError;
-use crate::controller::voice_engine::voice_vox;
+use crate::controller::voice_engine::voicevox;
 
 static AUDIO_DATA_TREE_INDEX: &str = "tree_index";
 static AUDIO_DATA_TREE_DATA: &str = "tree_data";
@@ -219,7 +219,7 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
     if config.is_voice_vox_config() {
         let voice_vox_config = config.get_voice_vox_config();
         log::debug!("Generating audio by text: {}", translated_text.clone());
-        let audio_data = voice_vox::gen_audio(&voice_vox_config, translated_text.clone()).await;
+        let audio_data = voicevox::gen_audio(&voice_vox_config, translated_text.clone()).await;
         log::debug!("Generate audio cache success");
         match audio_data {
             Ok(audio) => {
