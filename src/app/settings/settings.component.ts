@@ -47,6 +47,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
       this.ngZone.run(() => {
         this.audioConfig = config;
         this.initAudioOutputs();
+        this.initAudioInputs();
       });
     });
   }

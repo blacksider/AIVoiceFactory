@@ -39,17 +39,6 @@
         </nz-select>
       </nz-form-control>
     </nz-form-item>
-    <nz-form-item *ngIf="device.value === 'cpu'">
-      <nz-form-label [nzSpan]="24" nzFor="cpu_arch">CPU架构</nz-form-label>
-      <nz-form-control nzMd="6" nzSm="12" nzXs="24">
-        <nz-select id="cpu_arch" name="cpu_arch"
-                   formControlName="cpu_arch">
-          <nz-option nzValue="x86" nzLabel="x86"></nz-option>
-          <nz-option nzValue="x64" nzLabel="x64"></nz-option>
-          <nz-option nzValue="arm64" nzLabel="arm64"></nz-option>
-        </nz-select>
-      </nz-form-control>
-    </nz-form-item>
   </ng-container>
   <nz-form-item>
     <nz-form-control [nzSpan]="24">

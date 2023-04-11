@@ -1,11 +1,11 @@
-import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
+import {Component, HostListener, NgZone, OnDestroy, OnInit} from '@angular/core';
 import {WindowService} from './window.service';
 import {AudioCacheDetail, AudioCacheIndex} from './audio-data';
 import {NzResizeEvent} from 'ng-zorro-antd/resizable';
 import {VoiceRecognitionService} from "../voice-recognition/voice-recognition.service";
 import {listen} from "@tauri-apps/api/event";
 import {LocalStorageService} from "../local-storage.service";
-import {Subject, takeUntil} from "rxjs";
+import {debounceTime, Subject, takeUntil} from "rxjs";
 import {NzModalRef, NzModalService} from "ng-zorro-antd/modal";
 
 const KEY_WIDTH = "windowWidth";
@@ -25,8 +25,10 @@ export class WindowComponent implements OnInit, OnDestroy {
   isRecording = false;
 
   private unListenRecorderState?: () => void;
+  private windowResize = new Subject<number>();
   private unSub = new Subject();
   private confirmModal?: NzModalRef;
+  private currentWindowSize = window.innerWidth;
 
   constructor(private service: WindowService,
               private voiceRecognitionService: VoiceRecognitionService,
@@ -36,13 +38,32 @@ export class WindowComponent implements OnInit, OnDestroy {
     this.audioDetails = {};
   }
 
+  @HostListener('window:resize', ['$event'])
+  onResize() {
+    let windowWidth = window.innerWidth;
+    this.windowResize.next(windowWidth);
+  }
+
   ngOnInit(): void {
+    this.windowResize
+      .asObservable()
+      .pipe(
+        takeUntil(this.unSub),
+        debounceTime(200)
+      )
+      .subscribe(windowWidth => {
+        let ratio = this.siderWidth / this.currentWindowSize;
+        this.siderWidth = windowWidth * ratio;
+        this.currentWindowSize = windowWidth;
+      });
     const storedWidth = this.localStorage.get(KEY_WIDTH);
     if (!!storedWidth) {
       this.siderWidth = Number.parseInt(storedWidth, 10);
+      if (this.siderWidth >= this.currentWindowSize) {
+        this.siderWidth = this.currentWindowSize / 2;
+      }
     } else {
-      let windowWidth = window.innerWidth;
-      this.siderWidth = windowWidth / 2;
+      this.siderWidth = this.currentWindowSize / 2;
     }
     this.syncOnTextRecognize = this.service.getSyncOnTextState();
     this.loadAudios();
@@ -72,6 +93,7 @@ export class WindowComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.unSub.next({});
     this.unSub.complete();
+    this.windowResize.complete();
     if (this.unListenRecorderState) {
       this.unListenRecorderState();
     }

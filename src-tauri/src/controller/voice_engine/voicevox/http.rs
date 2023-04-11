@@ -5,12 +5,16 @@ use reqwest::StatusCode;
 use crate::config::voice_engine::VoiceVoxEngineConfig;
 use crate::controller::errors::{CommonError, ProgramError};
 use crate::controller::voice_engine::voicevox::model::{VoiceVoxSpeaker, VoiceVoxSpeakerInfo};
-use crate::utils;
+use crate::utils::http;
+
+async fn concat_api(config: &VoiceVoxEngineConfig, suffix: &str) -> String {
+    http::concat_api(&*config.build_api().await, suffix)
+}
 
 pub async fn audio_query(config: &VoiceVoxEngineConfig, text: String) -> Result<serde_json::Value, ProgramError> {
     let client = reqwest::Client::new();
     let res: reqwest::Response = client
-        .post(format!("{}/audio_query", config.build_api()))
+        .post(concat_api(config, "audio_query").await)
         .query(&[("speaker", config.get_speaker().to_string()), ("text", text)])
         .send()
         .await?;
@@ -30,7 +34,7 @@ pub async fn synthesis(config: &VoiceVoxEngineConfig, audio_data: serde_json::Va
 
     let client = reqwest::Client::new();
     let res = client
-        .post(format!("{}/synthesis", config.build_api()))
+        .post(concat_api(config, "synthesis").await)
         .query(&[("speaker", config.get_speaker())])
         .headers(headers)
         .json(&audio_data)
@@ -45,9 +49,12 @@ pub async fn synthesis(config: &VoiceVoxEngineConfig, audio_data: serde_json::Va
 
 
 pub async fn speakers(config: &VoiceVoxEngineConfig) -> Result<Vec<VoiceVoxSpeaker>, ProgramError> {
-    utils::http::get_json(format!("{}/speakers", config.build_api())).await
+    let url = concat_api(config, "speakers").await;
+    log::debug!("load speakers: {}", url.clone());
+    http::get_json(url).await
 }
 
 pub async fn speaker_info(config: &VoiceVoxEngineConfig, speaker_uuid: String) -> Result<VoiceVoxSpeakerInfo, ProgramError> {
-    utils::http::get_json(format!("{}/speaker_info?speaker_uuid={}", config.build_api(), speaker_uuid)).await
+    let suffix = format!("speaker_info?speaker_uuid={}", speaker_uuid);
+    http::get_json(concat_api(config, &*suffix).await).await
 }

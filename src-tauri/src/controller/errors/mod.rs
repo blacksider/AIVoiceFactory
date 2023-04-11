@@ -103,6 +103,6 @@ impl_program_error!(hound::Error);
 impl_program_error!(rodio::PlayError);
 impl_program_error!(rodio::StreamError);
 impl_program_error!(rodio::decoder::DecoderError);
-impl_program_error!(libloading::Error);
+impl_program_error!(sevenz_rust::Error);
 impl_program_error!(Box<bincode::ErrorKind>);
 impl_program_error!(CommonError);

@@ -24,8 +24,23 @@ pub mod cmd {
     }
 
     #[tauri::command]
-    pub async fn is_downloading_voicevox_bin() -> bool {
-        voicevox::is_downloading().await
+    pub fn is_loading_voicevox_engine() -> bool {
+        voicevox::is_binary_loading()
+    }
+
+    #[tauri::command]
+    pub fn is_voicevox_engine_initialized() -> bool {
+        voicevox::is_binary_initialized()
+    }
+
+    #[tauri::command]
+    pub fn check_voicevox_engine() {
+        voice_engine::check_voicevox();
+    }
+
+    #[tauri::command]
+    pub async fn stop_loading_voicevox_engine() {
+        voicevox::stop_binary_loading().await
     }
 
     #[tauri::command]

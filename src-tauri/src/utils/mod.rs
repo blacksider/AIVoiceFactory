@@ -1,30 +1,24 @@
-pub mod http;
-
 use std::env::current_dir;
 use std::path::PathBuf;
 
-#[cfg(not(target_os = "windows"))]
-use tauri::api::path::home_dir;
+pub mod http;
 
+/// app home dir is current exe path
 pub fn get_app_home_dir() -> PathBuf {
-    // on windows, set to current app path
-    #[cfg(target_os = "windows")]
     if let Err(e) = current_dir() {
         log::error!("Failed to get app home dir. error: {}", e);
         std::process::exit(-1);
     } else {
         return current_dir().unwrap();
     }
-    // if not on windows, set to use app data path
-    #[cfg(not(target_os = "windows"))]
-    match home_dir() {
-        None => {
-            error!("Failed to get app home dir");
-            std::process::exit(-1);
-        }
-        Some(path) => {
-            // APP_DIR is tauri platform app data path
-            return path.join(APP_DIR);
+}
+
+/// find the the first occurrence of specific file with given file name inside given directory
+pub fn find_file_in_dir(dir: PathBuf, file_name: &str) -> Option<PathBuf> {
+    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_name() == file_name {
+            return Some(entry.into_path());
         }
     }
+    None
 }

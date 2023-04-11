@@ -1,4 +1,4 @@
-import {Component, Input, OnInit} from '@angular/core';
+import {Component, Input, OnChanges, OnDestroy, OnInit, SimpleChanges} from '@angular/core';
 import {FormControl, FormGroup} from '@angular/forms';
 import {VoiceEngineService} from '../voice-engine.service';
 import {VoiceVoxSpeaker} from './voice-vox';
@@ -10,8 +10,9 @@ import {Subject, takeUntil} from "rxjs";
   templateUrl: './voice-vox-engine.component.html',
   styleUrls: ['./voice-vox-engine.component.less']
 })
-export class VoiceVoxEngineComponent implements OnInit {
+export class VoiceVoxEngineComponent implements OnInit, OnChanges, OnDestroy {
   @Input() config!: FormGroup;
+  @Input() initialized!: boolean;
 
   speakers?: VoiceVoxSpeaker[];
 
@@ -30,11 +31,19 @@ export class VoiceVoxEngineComponent implements OnInit {
           if (!this.device.value) {
             this.device.setValue("cpu");
           }
-          if (!this.cpuArch.value) {
-            this.cpuArch.setValue("x64");
-          }
         }
       });
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['initialized']) {
+      this.loadSpeakers();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.ngUnsub.next({});
+    this.ngUnsub.complete();
   }
 
   get configType(): FormControl {
@@ -43,10 +52,6 @@ export class VoiceVoxEngineComponent implements OnInit {
 
   get device(): FormControl {
     return this.config.get('device') as FormControl;
-  }
-
-  get cpuArch(): FormControl {
-    return this.config.get('cpu_arch') as FormControl;
   }
 
   get speakerUuid(): FormControl {
@@ -58,6 +63,10 @@ export class VoiceVoxEngineComponent implements OnInit {
   }
 
   loadSpeakers() {
+    console.log(this.initialized);
+    if (!this.initialized) {
+      return;
+    }
     this.service.getVoiceVoxSpeakers()
       .subscribe(value => {
         this.speakers = value;

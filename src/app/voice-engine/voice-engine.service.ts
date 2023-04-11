@@ -40,12 +40,24 @@ export class VoiceEngineService {
       );
   }
 
-  isDownloadVoicevoxBin(): Observable<boolean> {
-    return fromPromise<boolean>(invoke<boolean>('is_downloading_voicevox_bin'));
+  isVoicevoxEngineInitialized(): Observable<any> {
+    return fromPromise<any>(invoke<any>('is_voicevox_engine_initialized'));
+  }
+
+  isLoadingVoicevoxEngine(): Observable<boolean> {
+    return fromPromise<boolean>(invoke<boolean>('is_loading_voicevox_engine'));
+  }
+
+  stopLoadingVoicevoxEngine(): Observable<any> {
+    return fromPromise<any>(invoke<any>('stop_loading_voicevox_engine'));
+  }
+
+  checkVoicevoxEngine(): Observable<any> {
+    return fromPromise<any>(invoke<any>('check_voicevox_engine'));
   }
 }
 
 export const voiceEngineConfigResolver: ResolveFn<VoiceEngineConfig> =
-    () => {
+  () => {
     return inject(VoiceEngineService).getVoiceEngineConfig();
   };

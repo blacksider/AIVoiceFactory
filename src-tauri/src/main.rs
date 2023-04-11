@@ -78,8 +78,9 @@ fn main() {
             tauri::async_runtime::spawn(async {
                 generator::start_check_audio_caches();
             });
-
-            voice_engine::check_voicevox();
+            tauri::async_runtime::spawn(async {
+                voice_engine::check_voicevox();
+            });
 
             match audio_recorder::start_shortcut(&app.app_handle()) {
                 Ok(_) => {}
@@ -93,6 +94,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::mapping::cmd::get_voice_engine_config,
             commands::mapping::cmd::save_voice_engine_config,
+            commands::mapping::cmd::is_voicevox_engine_initialized,
+            commands::mapping::cmd::is_loading_voicevox_engine,
+            commands::mapping::cmd::check_voicevox_engine,
+            commands::mapping::cmd::stop_loading_voicevox_engine,
             commands::mapping::cmd::get_auto_translation_config,
             commands::mapping::cmd::save_auto_translation_config,
             commands::mapping::cmd::get_voice_recognition_config,

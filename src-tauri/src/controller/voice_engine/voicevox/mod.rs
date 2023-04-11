@@ -9,70 +9,62 @@ mod binary;
 mod http;
 pub mod model;
 
-pub async fn is_downloading() -> bool {
-    binary::is_downloading().await
+pub fn is_binary_loading() -> bool {
+    binary::is_loading()
 }
 
-pub fn check_and_load(config: VoiceVoxEngineConfig) {
+pub fn is_binary_initialized() -> bool {
+    binary::is_initialized()
+}
+
+pub async fn stop_binary_loading() {
+    binary::stop_loading().await
+}
+
+pub fn check_and_load_binary(config: VoiceVoxEngineConfig) {
     if config.config_type != VoiceVoxConfigType::Binary {
         return;
     }
     tauri::async_runtime::spawn(async {
         match binary::check_and_load(config).await {
             Ok(_) => {
-                log::debug!("Check and load voicevox success");
+                log::debug!("Check and load voicevox engine success");
             }
             Err(err) => {
-                log::debug!("Check and load voicevox failed, err: {}", err);
+                log::debug!("Check and load voicevox engine failed, err: {}", err);
             }
         }
     });
 }
 
-pub fn check_and_unload() {
+pub fn check_and_unload_binary() {
     tauri::async_runtime::spawn(async {
         match binary::check_and_unload().await {
             Ok(_) => {
-                log::debug!("Check and unload voicevox success");
+                log::debug!("Check and unload voicevox engine success");
             }
             Err(err) => {
-                log::debug!("Check and unload voicevox failed, err: {}", err);
+                log::debug!("Check and unload voicevox engine failed, err: {}", err);
             }
         }
     });
 }
 
+pub async fn build_engine_api() -> String {
+    let params = binary::get_engine_params().await;
+    format!("http://127.0.0.1:{}", params.port)
+}
+
 pub async fn gen_audio(config: &VoiceVoxEngineConfig, text: String) -> Result<Bytes, ProgramError> {
-    match config.config_type {
-        VoiceVoxConfigType::Http => {
-            let data = http::audio_query(config, text).await?;
-            let audio = http::synthesis(config, data).await?;
-            Ok(audio)
-        }
-        VoiceVoxConfigType::Binary => {
-            binary::tts(text, config.speaker_style_id).await
-        }
-    }
+    let data = http::audio_query(config, text).await?;
+    let audio = http::synthesis(config, data).await?;
+    Ok(audio)
 }
 
 pub async fn speakers(config: &VoiceVoxEngineConfig) -> Result<Vec<VoiceVoxSpeaker>, ProgramError> {
-    match config.config_type {
-        VoiceVoxConfigType::Http => {
-            http::speakers(config).await
-        }
-        VoiceVoxConfigType::Binary => {
-            binary::speakers().await
-        }
-    }
+    http::speakers(config).await
 }
 
 pub async fn speaker_info(config: &VoiceVoxEngineConfig, speaker_uuid: String) -> Result<VoiceVoxSpeakerInfo, ProgramError> {
-    match config.config_type {
-        VoiceVoxConfigType::Http => {
-            http::speaker_info(config, speaker_uuid).await
-        }
-        VoiceVoxConfigType::Binary => {
-            binary::speaker_info(speaker_uuid).await
-        }
-    }
+    http::speaker_info(config, speaker_uuid).await
 }

@@ -4,7 +4,8 @@ use lazy_static::lazy_static;
 
 use crate::config::config;
 use crate::controller::errors::ProgramError;
-use crate::controller::voice_engine::voicevox::{check_and_load, check_and_unload};
+use crate::controller::voice_engine::voicevox;
+use crate::controller::voice_engine::voicevox::{check_and_load_binary, check_and_unload_binary};
 
 static VOICE_ENGINE_CONFIG: &str = "voice_engine";
 
@@ -47,8 +48,15 @@ unsafe impl Send for VoiceVoxEngineConfig {}
 unsafe impl Sync for VoiceVoxEngineConfig {}
 
 impl VoiceVoxEngineConfig {
-    pub fn build_api(&self) -> String {
-        format!("{}://{}", self.protocol, self.api_addr)
+    pub async fn build_api(&self) -> String {
+        match self.config_type {
+            VoiceVoxConfigType::Http => {
+                format!("{}://{}", self.protocol, self.api_addr)
+            }
+            VoiceVoxConfigType::Binary => {
+                voicevox::build_engine_api().await
+            }
+        }
     }
 
     pub fn get_speaker(&self) -> u32 {
@@ -150,10 +158,10 @@ impl VoiceEngineConfigManager {
             let config = self.config.get_voice_vox_config();
             match config.config_type {
                 VoiceVoxConfigType::Binary => {
-                    check_and_load(config);
+                    check_and_load_binary(config);
                 }
                 _ => {
-                    check_and_unload();
+                    check_and_unload_binary();
                 }
             }
         }

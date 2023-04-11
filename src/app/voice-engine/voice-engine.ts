@@ -13,7 +13,6 @@ export interface VoiceEngineConfigData {
 export class VoiceVoxEngineConfig implements VoiceEngineConfigData {
   config_type!: string;
   device!: string;
-  cpu_arch?: string;
   protocol!: string;
   api_addr!: string;
   speaker_uuid!: string;
