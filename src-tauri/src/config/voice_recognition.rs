@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 use lazy_static::lazy_static;
 
@@ -11,15 +11,26 @@ lazy_static! {
     pub static ref VOICE_REC_CONFIG_MANAGER: Mutex<VoiceRecognitionConfigManager> = Mutex::new(VoiceRecognitionConfigManager::init());
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]
+pub enum WhisperConfigType {
+    #[strum(serialize = "http")]
+    Http,
+    #[strum(serialize = "binary")]
+    Binary,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RecognizeByWhisper {
+    pub(crate) config_type: WhisperConfigType,
+    // tiny, tiny.en, base, base.en, small, small.en, medium, medium.en, large-v1, large
+    pub(crate) use_model: String,
     pub(crate) api_addr: String,
     pub(crate) language: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
-enum RecognitionTool {
+pub enum RecognitionTool {
     Whisper(RecognizeByWhisper)
 }
 
@@ -28,7 +39,7 @@ pub struct VoiceRecognitionConfig {
     pub(crate) enable: bool,
     #[serde(rename = "recordKey")]
     pub(crate) record_key: String,
-    tool: RecognitionTool,
+    pub(crate) tool: RecognitionTool,
 }
 
 impl VoiceRecognitionConfig {
@@ -50,6 +61,8 @@ fn gen_default_config() -> Result<VoiceRecognitionConfig, ProgramError> {
         enable: false,
         record_key: "F1".to_string(),
         tool: RecognitionTool::Whisper(RecognizeByWhisper {
+            config_type: WhisperConfigType::Http,
+            use_model: "base".to_string(),
             api_addr: empty_str.clone(),
             language: None,
         }),

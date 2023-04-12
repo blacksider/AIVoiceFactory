@@ -14,7 +14,7 @@
   </nz-form-item>
   <ng-container *ngIf="enable.value === true" formGroupName="tool">
     <nz-form-item>
-      <nz-form-label [nzSpan]="24" nzFor="type">翻译器</nz-form-label>
+      <nz-form-label [nzSpan]="24" nzFor="type">识别器</nz-form-label>
       <nz-form-control nzMd="6" nzSm="12" nzXs="24">
         <nz-select id="type" name="type"
                    formControlName="type">
@@ -28,12 +28,42 @@
       <nz-divider nzType="horizontal"></nz-divider>
       <h4>Whisper</h4>
       <nz-form-item>
-        <nz-form-label [nzSpan]="24" nzFor="api_addr">地址</nz-form-label>
-        <nz-form-control nzMd="12" nzXs="24">
-          <input id="api_addr" name="api_addr" nz-input
-                 formControlName="api_addr"/>
+        <nz-form-label [nzSpan]="24" nzFor="config_type">类型</nz-form-label>
+        <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+          <nz-select id="config_type" name="config_type"
+                     formControlName="config_type">
+            <nz-option [nzValue]="whisperConfigTypes.HTTP" nzLabel="HTTP"></nz-option>
+            <nz-option [nzValue]="whisperConfigTypes.BINARY" nzLabel="程序"></nz-option>
+          </nz-select>
         </nz-form-control>
       </nz-form-item>
+      <ng-container *ngIf="whisperConfigType.value === whisperConfigTypes.HTTP">
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzFor="api_addr">地址</nz-form-label>
+          <nz-form-control nzMd="12" nzXs="24">
+            <input id="api_addr" name="api_addr" nz-input
+                   formControlName="api_addr"/>
+          </nz-form-control>
+        </nz-form-item>
+      </ng-container>
+      <ng-container *ngIf="whisperConfigType.value === whisperConfigTypes.BINARY">
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzFor="use_model">模型</nz-form-label>
+          <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+            <nz-select id="use_model" name="use_model"
+                       formControlName="use_model">
+              <nz-option *ngFor="let model of whisperModels"
+                         nzCustomContent
+                         [nzValue]="model.Model"
+                         [nzLabel]="model.Model">
+                <span>{{model.Model}}</span>
+                <span class="space-left">-</span>
+                <span class="space-left">{{model.Disk}}</span>
+              </nz-option>
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+      </ng-container>
       <nz-form-item>
         <nz-form-label [nzSpan]="24" nzFor="from">语言</nz-form-label>
         <nz-form-control nzMd="6" nzSm="12" nzXs="24">

@@ -1,4 +1,10 @@
 pub mod cmd {
+    use std::sync::Arc;
+
+    use lazy_static::lazy_static;
+    use tauri::Manager;
+    use tokio::sync::Mutex as AsyncMutex;
+
     use crate::config::{auto_translation, voice_engine, voice_recognition};
     use crate::config::auto_translation::AutoTranslationConfig;
     use crate::config::voice_engine::{VoiceEngineConfig, VoiceVoxEngineConfig};
@@ -8,18 +14,24 @@ pub mod cmd {
     use crate::controller::generator::{AudioCacheDetail, AudioCacheIndex};
     use crate::controller::voice_engine::voicevox;
     use crate::controller::voice_engine::voicevox::model::{VoiceVoxSpeaker, VoiceVoxSpeakerInfo};
+    use crate::controller::voice_recognition::whisper;
+
+    lazy_static! {
+        static ref GEN_AUDIO_LOCK: Arc<AsyncMutex<()>> = Arc::new(AsyncMutex::new(()));
+    }
+
 
     #[tauri::command]
-    pub fn get_voice_engine_config() -> Option<VoiceEngineConfig> {
+    pub async fn get_voice_engine_config() -> Option<VoiceEngineConfig> {
         let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER
-            .lock().unwrap();
+            .lock().await;
         Some(manager.get_config())
     }
 
     #[tauri::command]
-    pub fn save_voice_engine_config(config: VoiceEngineConfig) -> Option<bool> {
+    pub async fn save_voice_engine_config(config: VoiceEngineConfig) -> Option<bool> {
         let mut manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER
-            .lock().unwrap();
+            .lock().await;
         Some(manager.save_config(config))
     }
 
@@ -34,8 +46,8 @@ pub mod cmd {
     }
 
     #[tauri::command]
-    pub fn check_voicevox_engine() {
-        voice_engine::check_voicevox();
+    pub async fn check_voicevox_engine() {
+        voice_engine::check_voicevox().await;
     }
 
     #[tauri::command]
@@ -44,39 +56,50 @@ pub mod cmd {
     }
 
     #[tauri::command]
-    pub fn get_auto_translation_config() -> Option<AutoTranslationConfig> {
-        let manager = auto_translation::AUTO_TRANS_CONFIG_MANAGER
-            .lock().unwrap();
+    pub async fn get_auto_translation_config() -> Option<AutoTranslationConfig> {
+        let manager =
+            auto_translation::AUTO_TRANS_CONFIG_MANAGER.lock().await;
         Some(manager.get_config())
     }
 
     #[tauri::command]
-    pub fn save_auto_translation_config(config: AutoTranslationConfig) -> Option<bool> {
-        let mut manager = auto_translation::AUTO_TRANS_CONFIG_MANAGER
-            .lock().unwrap();
+    pub async fn save_auto_translation_config(config: AutoTranslationConfig) -> Option<bool> {
+        let mut manager =
+            auto_translation::AUTO_TRANS_CONFIG_MANAGER.lock().await;
         Some(manager.save_config(config))
     }
 
     #[tauri::command]
-    pub fn get_voice_recognition_config() -> Option<VoiceRecognitionConfig> {
-        let manager = voice_recognition::VOICE_REC_CONFIG_MANAGER
-            .lock().unwrap();
+    pub async fn get_voice_recognition_config() -> Option<VoiceRecognitionConfig> {
+        let manager =
+            voice_recognition::VOICE_REC_CONFIG_MANAGER.lock().await;
         Some(manager.get_config())
     }
 
     #[tauri::command]
-    pub fn save_voice_recognition_config(app_handle: tauri::AppHandle<tauri::Wry>, config: VoiceRecognitionConfig) -> Option<bool> {
+    pub async fn save_voice_recognition_config(app_handle: tauri::AppHandle<tauri::Wry>,
+                                               config: VoiceRecognitionConfig) -> bool {
         // try to get original config to extract record_key
-        let old_config = voice_recognition::load_voice_recognition_config();
+        let old_config =
+            voice_recognition::load_voice_recognition_config();
         if old_config.is_err() {
-            log::error!("Unable to load current voice recognition config, err: {}", old_config.unwrap_err());
-            return Some(false);
+            log::error!("Unable to load current voice recognition config, err: {}",
+                old_config.unwrap_err());
+            return false;
         }
         let old_config = old_config.unwrap();
 
         let mut manager = voice_recognition::VOICE_REC_CONFIG_MANAGER
-            .lock().unwrap();
-        let result = manager.save_config(config.clone());
+            .lock().await;
+        let success = manager.save_config(config.clone());
+
+        if success {
+            let old_config_clone = old_config.clone();
+            let config_clone = config.clone();
+            tauri::async_runtime::spawn(async move {
+                whisper::update_model(&old_config_clone, &config_clone).await
+            });
+        }
 
         // try to update shortcut by original key and new key
         match audio_recorder::update_shortcut(&app_handle, &old_config, &config) {
@@ -86,7 +109,7 @@ pub mod cmd {
             }
         }
 
-        Some(result)
+        success
     }
 
     #[tauri::command]
@@ -146,22 +169,36 @@ pub mod cmd {
     }
 
     #[tauri::command]
-    pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
-        let audio_index = generator::generate_audio(text).await;
-        match audio_index {
-            None => None,
-            Some(index) => {
-                match generator::play_audio(index.name.clone()) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        log::error!("Cannot play audio {}, err: {}",
-                            index.name.clone(),
-                        err)
-                    }
-                }
-                Some(index)
+    pub async fn generate_audio(app_handle: tauri::AppHandle<tauri::Wry>,
+                                text: String) -> Option<AudioCacheIndex> {
+        let lock = GEN_AUDIO_LOCK.try_lock();
+        match lock {
+            Ok(_) => {}
+            Err(_) => {
+                log::debug!("Generate audio is executing");
+                return None;
             }
         }
+        log::debug!("Call cmd generate audio by text: {}", text.clone());
+        let mut audio_index = generator::generate_audio(text).await;
+        if let Some(index) = audio_index.take() {
+            // TODO emit audio list change event
+            app_handle.get_window("main")
+                .unwrap()
+                .emit("on_audio_generated", index.clone())
+                .unwrap();
+            match generator::play_audio(index.name.clone()) {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("Cannot play audio {}, err: {}",
+                            index.name.clone(),
+                        err)
+                }
+            }
+            log::debug!("Generated index: {:?}", index.clone());
+            return Some(index);
+        }
+        None
     }
 
     #[tauri::command]
@@ -178,15 +215,8 @@ pub mod cmd {
     }
 
     async fn get_voice_vox_config() -> Option<VoiceVoxEngineConfig> {
-        let config = tauri::async_runtime::spawn_blocking(move || {
-            let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().unwrap();
-            manager.get_config()
-        }).await;
-        if config.is_err() {
-            log::error!("Failed to retrieve voice engine config");
-            return None;
-        }
-        let config = config.unwrap();
+        let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().await;
+        let config = manager.get_config();
         if !config.is_voice_vox_config() {
             log::error!("Current voice engine is not voice vox");
             return None;
@@ -253,7 +283,7 @@ pub mod cmd {
     }
 
     #[tauri::command]
-    pub fn is_recorder_recording() -> bool {
-        audio_recorder::is_recording()
+    pub async fn is_recorder_recording() -> bool {
+        audio_recorder::is_recording().await
     }
 }

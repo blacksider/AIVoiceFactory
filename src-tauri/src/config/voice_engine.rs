@@ -1,6 +1,5 @@
-use std::sync::Mutex;
-
 use lazy_static::lazy_static;
+use tokio::sync::Mutex as AsyncMutex;
 
 use crate::config::config;
 use crate::controller::errors::ProgramError;
@@ -10,8 +9,8 @@ use crate::controller::voice_engine::voicevox::{check_and_load_binary, check_and
 static VOICE_ENGINE_CONFIG: &str = "voice_engine";
 
 lazy_static! {
-  pub static ref VOICE_ENGINE_CONFIG_MANAGER: Mutex<VoiceEngineConfigManager> =
-    Mutex::new(VoiceEngineConfigManager::init());
+  pub static ref VOICE_ENGINE_CONFIG_MANAGER: AsyncMutex<VoiceEngineConfigManager> =
+    AsyncMutex::new(VoiceEngineConfigManager::init());
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]
@@ -19,7 +18,6 @@ pub enum EngineType {
     #[strum(serialize = "VoiceVox")]
     VoiceVox,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]
 pub enum VoiceVoxConfigType {
@@ -124,9 +122,9 @@ fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ProgramErr
     config::save_config(VOICE_ENGINE_CONFIG, config)
 }
 
-pub fn check_voicevox() {
+pub async fn check_voicevox() {
     log::debug!("Check voice engine voicevox config");
-    let manager = VOICE_ENGINE_CONFIG_MANAGER.lock().unwrap();
+    let manager = VOICE_ENGINE_CONFIG_MANAGER.lock().await;
     manager.check_voice_vox();
 }
 

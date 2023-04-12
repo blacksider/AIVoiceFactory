@@ -1,16 +1,18 @@
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpListener;
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
-use std::time::Duration;
 
 use lazy_static::lazy_static;
-use tokio::sync::{mpsc, Mutex as AsyncMutex};
+use tokio::sync::{broadcast, Mutex as AsyncMutex};
+use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::RwLock as AsyncRwLock;
+use winapi::um::winbase::CREATE_NO_WINDOW;
 
 use crate::config::voice_engine::VoiceVoxEngineConfig;
 use crate::controller::errors::ProgramError;
@@ -26,6 +28,8 @@ const ENGINE_DIR: &str = "voicevox_engine";
 const OUTPUT: &str = "output.log";
 const OUTPUT_ERR: &str = "err.log";
 
+const ENGINE_EXE: &str = "run.exe";
+
 const DOWNLOADER_URL: &str =
     "https://github.com/VOICEVOX/voicevox_engine/releases/download/0.14.4/";
 const DONWLOADER_FILE_CPU: &str = "voicevox_engine-windows-cpu-0.14.4.7z.001";
@@ -37,7 +41,7 @@ lazy_static! {
     static ref ENGINE_PROCESS: Arc<AsyncMutex<EngineProcess>> = Arc::new(AsyncMutex::new(EngineProcess::new()));
     static ref ENGINE_PROCESS_INITIALIZED: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
     static ref ENGINE_LOADING: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-    static ref ENGINE_STOP_SIG: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    static ref ENGINE_STOP_SIG: (Sender<()>, Receiver<()>) = broadcast::channel(1);
 }
 
 #[derive(Debug, Clone)]
@@ -102,57 +106,72 @@ fn get_available_port() -> Option<u16> {
     None
 }
 
-async fn run_engine_exe(cmd: String,
-                        out: std::process::Stdio,
-                        err_out: std::process::Stdio) -> Result<(), ProgramError> {
-    let execution = Command::new("cmd")
-        .args(["/C", cmd.as_str()])
+#[cfg(target_os = "windows")]
+pub fn try_stop_engine_exe() -> Result<(), ProgramError> {
+    let data_path = get_data_path();
+    let data_path = data_path.to_str()
+        .ok_or("cannot parse data path to str")?;
+    log::debug!("Check exe {}", ENGINE_EXE);
+    let (process_exists, pid) = utils::windows::process_exists(ENGINE_EXE, data_path);
+    if process_exists {
+        log::debug!("Found exe {} already running with pid {}, ready to stop it", ENGINE_EXE, pid);
+        utils::windows::terminate_process(pid)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+async fn run_engine_exe<I, S>(exe: String,
+                              args: I,
+                              out: std::process::Stdio,
+                              err_out: std::process::Stdio) -> Result<(), ProgramError>
+    where
+        I: IntoIterator<Item=S>,
+        S: AsRef<OsStr>, {
+    try_stop_engine_exe()?;
+
+    let mut handle = Command::new(exe.clone())
+        .args(args)
         .stdout(out)
         .stderr(err_out)
+        .creation_flags(CREATE_NO_WINDOW) // DETACHED_PROCESS flag
         .spawn()?;
 
-    let execution_mutex = Arc::new(AsyncMutex::new(execution));
-
     ENGINE_PROCESS_INITIALIZED.store(true, Ordering::Release);
+    log::debug!("Voicevox engine exe started");
 
-    let (interrupted_tx, mut interrupted_rx) = mpsc::channel(1);
-    tokio::spawn(async move {
-        while !ENGINE_STOP_SIG.load(Ordering::Acquire) {
-            thread::sleep(Duration::from_secs(1));
-        }
-        match interrupted_tx.send(true).await {
-            Ok(_) => {
-                log::debug!("Interrupt signal for voicevox engine process send success");
-            }
-            Err(err) => {
-                log::debug!("Interrupt signal for voicevox engine process send failed, err: {}", err);
-            }
-        }
-    });
+    let (interrupted_tx, _) = &*ENGINE_STOP_SIG;
+    let mut interrupted_rx = interrupted_tx.subscribe();
 
+    // wait for process exit is a async way
     tokio::select! {
-        exit = async {
-            let mut execution = execution_mutex.lock().await;
-            execution.wait()?;
-            Ok::<(), ProgramError>(())
+        response = async {
+            let exit = handle.wait()?;
+            if exit.success() {
+                Ok::<_, ProgramError>(())
+            } else {
+                let code = exit.code().ok_or("exit with no error code")?;
+                Err(ProgramError::from(format!("exit with error code {}", code)))
+            }
         } => {
-            match exit {
+            match response {
                 Ok(_) => {
-                    log::debug!("Voicevox engine process exit unexpectedly");
-                },
+                    log::debug!("Voicevox engine stopped unexpectedly");
+                }
                 Err(err) => {
-                    log::debug!("Voicevox engine process exit with error: {}", err);
+                    log::error!("Voicevox engine stopped with err: {}", err);
                 }
             }
+            ENGINE_PROCESS_INITIALIZED.store(false, Ordering::Release);
         }
         _ = interrupted_rx.recv() => {
-            let mut execution = execution_mutex.lock().await;
-            match execution.kill() {
+            log::debug!("Interrupt voicevox engine signal received");
+            match handle.kill() {
                 Ok(_) => {
-                    log::debug!("Kill voicevox engine process");
+                    log::debug!("Kill voicevox engine success");
                 }
                 Err(err) => {
-                    log::error!("Kill voicevox engine process failed, err: {}", err);
+                    log::error!("Kill voicevox engine failed with err: {}", err);
                 }
             }
             ENGINE_PROCESS_INITIALIZED.store(false, Ordering::Release);
@@ -238,20 +257,8 @@ impl EngineProcess {
         log::debug!("Download voicevox engine 7z file to {}",
             download_tmp_file.clone().to_str().unwrap());
 
-        let (interrupted_tx, mut interrupted_rx) = mpsc::channel(1);
-        tokio::spawn(async move {
-            while !ENGINE_STOP_SIG.load(Ordering::SeqCst) {
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            }
-            match interrupted_tx.send(true).await {
-                Ok(_) => {
-                    log::debug!("Interrupt signal send success");
-                }
-                Err(err) => {
-                    log::debug!("Interrupt signal send failed, err: {}", err);
-                }
-            }
-        });
+        let (interrupted_tx, _) = &*ENGINE_STOP_SIG;
+        let mut interrupted_rx = interrupted_tx.subscribe();
 
         tokio::select! {
             response = async {
@@ -269,43 +276,41 @@ impl EngineProcess {
                 }
 
                 log::debug!("Download engine file success, ready to decompress file");
-                Ok::<_, ProgramError>(())
-            } => {
-                response?;
 
-                // extract 7z file to specific folder
+                 // extract 7z file to specific folder
                 log::debug!("Decompressing engine file");
                 let decompress_to = self.get_engine_path();
-                let stopped = Arc::new(AtomicBool::new(false));
                 let tmp_file = File::open(download_tmp_file.clone())?;
                 sevenz_rust::decompress_with_extract_fn(
                     tmp_file, decompress_to.clone(),
                     |entry, reader, dest| {
-                        if ENGINE_STOP_SIG.load(Ordering::Acquire) {
-                            stopped.store(true, Ordering::Release);
-                            return Ok(false);
-                        }
                         sevenz_rust::default_entry_extract_fn(entry, reader, dest)
                     }).or_else(|e| {
                         log::debug!("Failed to decompress engine file, err: {}", e);
                         Err(ProgramError::from("Decompress engine file error"))
                     })?;
-                if stopped.load(Ordering::Acquire) {
-                    // delete tmp file
-                    std::fs::remove_file(download_tmp_file)?;
-                    // delete extracted
-                    std::fs::remove_dir_all(decompress_to.clone())?;
-                    log::warn!("Manually stopped downloading, stop at decompress 7z file");
-                    return Ok(());
-                }
-                // delete tmp file
-                std::fs::remove_file(download_tmp_file)?;
                 log::debug!("Decompress engine file success, decompress folder: {}",
                     decompress_to.to_str().unwrap());
+
+                Ok::<_, ProgramError>(())
+            } => {
+                match response {
+                    Ok(_) => {
+                        // delete tmp file
+                        utils::silent_remove_file(download_tmp_file);
+                    }
+                    Err(err) => {
+                        log::error!("Download voicevox engine failed with err: {}", err);
+                        // if download and decompress failed, delete tmp file and decompress folder
+                        utils::silent_remove_file(download_tmp_file);
+                        let decompress_to = self.get_engine_path();
+                        utils::silent_remove_dir(decompress_to);
+                    }
+                }
             }
             _ = interrupted_rx.recv() => {
                 // delete tmp file
-                std::fs::remove_file(download_tmp_file)?;
+                utils::silent_remove_file(download_tmp_file);
                 log::debug!("Manually stopped downloading, stop downloading 7z file");
             }
         }
@@ -313,30 +318,14 @@ impl EngineProcess {
     }
 
     async fn initialize(&mut self) -> Result<(), ProgramError> {
-        ENGINE_STOP_SIG.store(false, Ordering::Release);
-
         self.check_and_download_binary().await?;
-
-        if ENGINE_STOP_SIG.load(Ordering::Acquire) {
-            return Err(ProgramError::from("Initialized stopped"));
-        }
 
         // start engine exe process
         let data_path = get_data_path();
 
-        let exe = utils::find_file_in_dir(self.get_engine_path(), "run.exe")
+        let exe = utils::find_file_in_dir(self.get_engine_path(), ENGINE_EXE)
             .ok_or(ProgramError::from("run.exe not found"))?;
-        let exe = exe.to_str().ok_or("unable to parse engine run exe path to str")?;
-
-        // wrap cmd
-        let cmd = format!(
-            "{} --host {} --port {}",
-            exe,
-            self.engine_params.host,
-            self.engine_params.port
-        );
-
-        log::debug!("Execute voicevox engine with cmd: {}", cmd.clone());
+        let exe = exe.to_string_lossy().to_string();
 
         let output_path = data_path.join(OUTPUT);
         let output = File::create(output_path.clone())?;
@@ -346,15 +335,23 @@ impl EngineProcess {
         let err_out = std::process::Stdio::from(err_output);
 
         // spawn run.exe
+        // wrap args
+        let host = self.engine_params.host.clone();
+        let port = format!("{}", self.engine_params.port);
+
         tauri::async_runtime::spawn(async move {
-            match run_engine_exe(cmd, out, err_out).await {
+            let args = [
+                "--host", host.as_str(),
+                "--port", port.as_str(),
+            ];
+            log::debug!("Run voicevox engine exe with command: {} {:?}", exe.clone(), args);
+
+            match run_engine_exe(exe, args, out, err_out).await {
                 Ok(_) => {
                     log::debug!("Voicevox engine exe exit");
-                    ENGINE_PROCESS_INITIALIZED.store(false, Ordering::Release);
                 }
                 Err(err) => {
                     log::debug!("Run voicevox engine exe failed, err: {}", err);
-                    ENGINE_PROCESS_INITIALIZED.store(false, Ordering::Release);
                 }
             }
         });
@@ -369,7 +366,6 @@ struct BinaryManager {
 unsafe impl Send for BinaryManager {}
 
 unsafe impl Sync for BinaryManager {}
-
 
 async fn set_process_options(opt: BinaryOption) {
     let lock = ENGINE_PROCESS.clone();
@@ -427,7 +423,13 @@ impl BinaryManager {
     }
 
     async fn stop_engine(&mut self) {
-        ENGINE_STOP_SIG.store(true, Ordering::Release);
+        let (interrupted_tx, _) = &*ENGINE_STOP_SIG;
+        match interrupted_tx.send(()) {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to send engine stop signal, err: {}", err);
+            }
+        }
     }
 
     async fn reinitialize(&mut self) -> Result<(), ProgramError> {

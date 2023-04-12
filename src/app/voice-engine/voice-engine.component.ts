@@ -1,5 +1,5 @@
 import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
-import {EngineTypes, VoiceEngineConfig, VoiceVoxEngineConfig} from './voice-engine';
+import {EngineTypes, VoiceEngineConfig, VoiceVoxConfigType, VoiceVoxEngineConfig} from './voice-engine';
 import {VoiceEngineService} from './voice-engine.service';
 import {ActivatedRoute} from '@angular/router';
 import {FormBuilder, FormControl, FormGroup} from '@angular/forms';
@@ -13,6 +13,7 @@ import {debounceTime, filter, interval, Subject, takeUntil} from 'rxjs';
 })
 export class VoiceEngineComponent implements OnInit, OnDestroy {
   engineTypes = EngineTypes;
+  voiceVoxConfigTypes = VoiceVoxConfigType;
   engineTypeValues = Object.keys(EngineTypes);
 
   voiceEngineConfigForm!: FormGroup;
@@ -97,6 +98,10 @@ export class VoiceEngineComponent implements OnInit, OnDestroy {
 
   get type(): FormControl {
     return this.voiceEngineConfigForm.get('type') as FormControl;
+  }
+
+  get voicevoxConfigType(): FormControl {
+    return this.voiceEngineConfigForm.get('config')?.get('config')?.get('config_type') as FormControl;
   }
 
   private checkVoicevoxEngineStatus() {

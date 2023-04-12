@@ -45,7 +45,7 @@ impl Error for ProgramError {
 
 impl fmt::Display for ProgramError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Error: {}", self.error)
+        write!(f, "{}", self.error)
     }
 }
 
@@ -104,5 +104,8 @@ impl_program_error!(rodio::PlayError);
 impl_program_error!(rodio::StreamError);
 impl_program_error!(rodio::decoder::DecoderError);
 impl_program_error!(sevenz_rust::Error);
+impl_program_error!(samplerate::error::Error);
+impl_program_error!(libloading::Error);
+impl_program_error!(tokio::sync::TryLockError);
 impl_program_error!(Box<bincode::ErrorKind>);
 impl_program_error!(CommonError);

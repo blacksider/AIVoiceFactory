@@ -1,14 +1,17 @@
+use std::io::Cursor;
+
 use reqwest::header::HeaderMap;
 use reqwest::multipart::{Form, Part};
 use reqwest::StatusCode;
 
-use crate::config::voice_recognition::RecognizeByWhisper;
+use crate::config::voice_recognition::{RecognitionTool, RecognizeByWhisper, VoiceRecognitionConfig, WhisperConfigType};
 use crate::controller::errors::{CommonError, ProgramError};
+use crate::controller::voice_recognition::whisper_lib;
 
 const REQ_TASK: &str = "transcribe";
 const REQ_OUTPUT: &str = "txt";
 
-pub async fn asr(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, ProgramError> {
+async fn asr_by_http(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, ProgramError> {
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();
@@ -38,5 +41,87 @@ pub async fn asr(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, P
         Ok(text)
     } else {
         Err(ProgramError::from(CommonError::from_http_error(res.status(), res.text().await?)))
+    }
+}
+
+// convert source wav to 16khz if it is not
+fn convert_wav_16k(wav: Vec<f32>, spec: hound::WavSpec) -> Result<Vec<f32>, ProgramError> {
+    if spec.sample_rate != 16000 {
+        samplerate::convert(spec.sample_rate,
+                            16000,
+                            spec.channels as usize,
+                            samplerate::ConverterType::SincBestQuality,
+                            &wav)
+            .map_err(|err| ProgramError::from(err))
+    } else {
+        Ok(wav)
+    }
+}
+
+async fn asr_by_lib(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, ProgramError> {
+    log::debug!("Do ast by whisper library");
+    let mut buffer = Cursor::new(data);
+    let reader = hound::WavReader::new(&mut buffer).unwrap();
+    let spec = reader.spec();
+    // Collect the samples from the reader into a Vec<f32>
+    log::debug!("Convert wav to 16k from {:?}{}", spec.sample_format, spec.bits_per_sample);
+    // read samples as f32
+    // TODO: is this always f32?
+    let mut samples = Vec::new();
+    for x in reader.into_samples::<f32>() {
+        samples.push(x?);
+    }
+
+    // try to convert to 16k
+    let samples = convert_wav_16k(samples, spec)?;
+    whisper_lib::recognize(config, samples).await
+}
+
+pub async fn asr(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, ProgramError> {
+    match config.config_type {
+        WhisperConfigType::Http => {
+            asr_by_http(config, data).await
+        }
+        WhisperConfigType::Binary => {
+            asr_by_lib(config, data).await
+        }
+    }
+}
+
+pub async fn check_whisper_lib() {
+    whisper_lib::init_library().await;
+}
+
+fn get_whisper_lib_model(config: &VoiceRecognitionConfig) -> Option<String> {
+    if config.enable {
+        match config.tool.clone() {
+            RecognitionTool::Whisper(whisper_config) => {
+                if whisper_config.config_type == WhisperConfigType::Binary {
+                    return Some(whisper_config.use_model);
+                }
+            }
+        }
+    }
+    None
+}
+
+pub async fn update_model(old: &VoiceRecognitionConfig, current: &VoiceRecognitionConfig) {
+    let old_model = get_whisper_lib_model(old);
+    let current_model = get_whisper_lib_model(current);
+    if current_model.is_none() && old_model.is_some() {
+        match whisper_lib::free_model().await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to free whisper model, err: {}", err);
+            }
+        }
+    }
+    if current_model.is_some() && old_model != current_model {
+        match whisper_lib::update_model(current_model.unwrap()).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to update whisper model, err: {}", err);
+            }
+        }
     }
 }

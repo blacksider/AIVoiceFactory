@@ -37,6 +37,17 @@ pub fn check_and_load_binary(config: VoiceVoxEngineConfig) {
     });
 }
 
+pub fn try_stop_engine_exe() {
+    match binary::try_stop_engine_exe() {
+        Ok(_) => {
+            log::debug!("Stop voicevox engine success");
+        }
+        Err(err) => {
+            log::error!("Stop voicevox engine failed, err: {}", err);
+        }
+    }
+}
+
 pub fn check_and_unload_binary() {
     tauri::async_runtime::spawn(async {
         match binary::check_and_unload().await {
@@ -44,7 +55,7 @@ pub fn check_and_unload_binary() {
                 log::debug!("Check and unload voicevox engine success");
             }
             Err(err) => {
-                log::debug!("Check and unload voicevox engine failed, err: {}", err);
+                log::error!("Check and unload voicevox engine failed, err: {}", err);
             }
         }
     });

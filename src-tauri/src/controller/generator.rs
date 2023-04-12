@@ -79,11 +79,15 @@ fn new_index_name() -> String {
     formatted_time
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AudioCacheIndex {
     pub name: String,
     pub time: String,
 }
+
+unsafe impl Send for AudioCacheIndex {}
+
+unsafe impl Sync for AudioCacheIndex {}
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct AudioCache {
@@ -197,25 +201,10 @@ fn save_audio(source: String, translated: String, audio: Bytes) -> Result<AudioC
 /// generate audio content and it's temporary wav content, and return current cache name
 pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
     let translated = translator::translate(text.clone()).await;
-    let translated_text: String;
-    match translated {
-        None => {
-            translated_text = text.clone();
-        }
-        Some(data) =>
-            {
-                translated_text = data;
-            }
-    }
-    let config = tauri::async_runtime::spawn_blocking(move || {
-        let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().unwrap();
-        manager.get_config()
-    }).await;
-    if config.is_err() {
-        log::error!("Failed to retrieve voice engine config");
-        return None;
-    }
-    let config = config.unwrap();
+    let translated_text: String = translated.or_else(|| Some(text.clone())).unwrap();
+    let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().await;
+    let config = manager.get_config();
+
     if config.is_voice_vox_config() {
         let voice_vox_config = config.get_voice_vox_config();
         log::debug!("Generating audio by text: {}", translated_text.clone());

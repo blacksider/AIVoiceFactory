@@ -1,6 +1,6 @@
 import {Component, HostListener, NgZone, OnDestroy, OnInit} from '@angular/core';
 import {WindowService} from './window.service';
-import {AudioCacheDetail, AudioCacheIndex} from './audio-data';
+import {AudioCacheDetail, AudioCacheIndex, AudioRegEvent} from './audio-data';
 import {NzResizeEvent} from 'ng-zorro-antd/resizable';
 import {VoiceRecognitionService} from "../voice-recognition/voice-recognition.service";
 import {listen} from "@tauri-apps/api/event";
@@ -72,13 +72,12 @@ export class WindowComponent implements OnInit, OnDestroy {
       .subscribe(value => {
         this.updateVoiceRegText(value);
       });
-    this.service.listenAudioIndex()
-      .pipe(takeUntil(this.unSub))
-      .subscribe(value => {
-        this.ngZone.run(() => {
-          this.audios.unshift(value);
-        });
+    listen('on_audio_generated', (event) => {
+      const audio = event.payload as AudioCacheIndex;
+      this.ngZone.run(() => {
+        this.audios.unshift(audio);
       });
+    });
     this.voiceRecognitionService.isRecorderRecording().subscribe(ret => {
       this.isRecording = ret;
     });
@@ -102,12 +101,12 @@ export class WindowComponent implements OnInit, OnDestroy {
     }
   }
 
-  private updateVoiceRegText(text: string) {
-    if (!text) {
+  private updateVoiceRegText(event: AudioRegEvent) {
+    if (!event.text) {
       return;
     }
     this.ngZone.run(() => {
-      this.inputMessage = text;
+      this.inputMessage = event.text;
     });
   }
 

@@ -7,6 +7,8 @@ use tauri::{AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, Sys
 
 use crate::config::voice_engine;
 use crate::controller::{audio_manager, audio_recorder, generator};
+use crate::controller::voice_engine::voicevox;
+use crate::controller::voice_recognition::whisper;
 
 mod logger;
 mod cypher;
@@ -37,6 +39,9 @@ pub fn handle_system_tray_event(app: &AppHandle<Wry>, event: SystemTrayEvent) {
             match id.as_str() {
                 "exit" => {
                     log::info!("Exit from system tray");
+                    // try to stop voicevox engine if running
+                    voicevox::check_and_unload_binary();
+                    voicevox::try_stop_engine_exe();
                     app.exit(0);
                 }
                 "close" => {
@@ -79,7 +84,8 @@ fn main() {
                 generator::start_check_audio_caches();
             });
             tauri::async_runtime::spawn(async {
-                voice_engine::check_voicevox();
+                voice_engine::check_voicevox().await;
+                whisper::check_whisper_lib().await;
             });
 
             match audio_recorder::start_shortcut(&app.app_handle()) {
@@ -116,6 +122,13 @@ fn main() {
         ])
         .system_tray(create_system_tray())
         .on_system_tray_event(handle_system_tray_event)
+        .on_window_event(|event| match event.event() {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                event.window().hide().unwrap();
+                api.prevent_close();
+            }
+            _ => {}
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

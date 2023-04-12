@@ -63,7 +63,6 @@ export class VoiceVoxEngineComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   loadSpeakers() {
-    console.log(this.initialized);
     if (!this.initialized) {
       return;
     }
