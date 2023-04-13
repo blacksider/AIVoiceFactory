@@ -5,8 +5,8 @@ use std::time::Duration;
 use cpal::Device;
 use cpal::traits::{DeviceTrait, HostTrait};
 use lazy_static::lazy_static;
-use tauri::{Window, Wry};
 
+use crate::common::{app, constants};
 use crate::controller::errors::{CommonError, ProgramError};
 
 lazy_static! {
@@ -222,17 +222,31 @@ pub fn get_input_device() -> Result<Device, ProgramError> {
             CommonError::new(String::from("No default input device"))))
 }
 
-fn check_audio_output_devices() -> Result<bool, ProgramError> {
+fn is_vec_equals(vec1: &Vec<String>, vec2: &Vec<String>) -> bool {
+    if vec1.len() != vec2.len() {
+        return false;
+    }
+    for i in 0..vec1.len() {
+        if vec1[i] != vec2[i] {
+            return false;
+        }
+    }
+    true
+}
+
+fn check_audio_output_devices(previous: &Vec<String>) -> Result<(bool, Option<Vec<String>>), ProgramError> {
     let lock = AUDIO_MANGER.clone();
     let mut audio_manager = lock.write().unwrap();
-    let host = cpal::default_host();
+    let outputs = available_output_devices();
+    if outputs.is_err() {
+        log::error!("Unable to get current outputs, err: {}", outputs.unwrap_err());
+        return Ok((false, None));
+    }
+    let outputs = outputs.unwrap();
     if let Some(name) = audio_manager.get_output_device_name() {
-        let output_devices = host.output_devices()?;
-
         let mut exists = false;
-        for (_, device) in output_devices.enumerate() {
-            let device_name = device.name()?;
-            if device_name == name {
+        for device_name in &outputs {
+            if *device_name == name {
                 exists = true;
                 break;
             }
@@ -241,26 +255,25 @@ fn check_audio_output_devices() -> Result<bool, ProgramError> {
             log::warn!("Current selected output device {} no longer exists, set to use default device", name.clone());
             // if selected device no longer exists, change to use default device
             audio_manager.change_output_device_to_default();
-            // emit change to frontend to let ui change as well
-            // TODO add watching for complete device list changes as well
-            return Ok(true);
+            return Ok((true, Some(outputs)));
         }
     }
-    Ok(false)
+    Ok((!is_vec_equals(previous, &outputs), Some(outputs)))
 }
 
-
-fn check_audio_input_devices() -> Result<bool, ProgramError> {
+fn check_audio_input_devices(previous: &Vec<String>) -> Result<(bool, Option<Vec<String>>), ProgramError> {
     let lock = AUDIO_MANGER.clone();
     let mut audio_manager = lock.write().unwrap();
-    let host = cpal::default_host();
+    let inputs = available_input_devices();
+    if inputs.is_err() {
+        log::error!("Unable to get current inputs, err: {}", inputs.unwrap_err());
+        return Ok((false, None));
+    }
+    let inputs = inputs.unwrap();
     if let Some(name) = audio_manager.get_input_device_name() {
-        let input_devices = host.input_devices()?;
-
         let mut exists = false;
-        for (_, device) in input_devices.enumerate() {
-            let device_name = device.name()?;
-            if device_name == name {
+        for device_name in &inputs {
+            if *device_name == name {
                 exists = true;
                 break;
             }
@@ -269,39 +282,70 @@ fn check_audio_input_devices() -> Result<bool, ProgramError> {
             log::warn!("Current selected input device {} no longer exists, set to use default device", name.clone());
             // if selected device no longer exists, change to use default device
             audio_manager.change_input_device_to_default();
-            // emit change to frontend to let ui change as well
-            // TODO add watching for complete device list changes as well
-            return Ok(true);
+            return Ok((true, Some(inputs)));
         }
     }
-    Ok(false)
+
+    // watching for complete device list changes as well
+    Ok((!is_vec_equals(previous, &inputs), Some(inputs)))
 }
 
-pub fn watch_audio_devices(window: Window<Wry>) {
+fn get_current_inputs_outputs() -> Option<(Vec<String>, Vec<String>)> {
+    let outputs = available_output_devices();
+    if outputs.is_err() {
+        return None;
+    }
+    let inputs = available_input_devices();
+    if inputs.is_err() {
+        return None;
+    }
+    return Some((inputs.unwrap(), outputs.unwrap()));
+}
+
+pub fn watch_audio_devices() {
     log::info!("Start watching audio devices");
     std::thread::spawn(move || {
         loop {
-            match check_audio_output_devices() {
-                Ok(changed) => {
+            let mut inputs;
+            let mut outputs;
+            if let Some((_inputs, _outputs)) = get_current_inputs_outputs() {
+                inputs = _inputs;
+                outputs = _outputs;
+            } else {
+                std::thread::sleep(Duration::from_secs(1));
+                continue;
+            }
+            std::thread::sleep(Duration::from_secs(1));
+            match check_audio_output_devices(&outputs) {
+                Ok((changed, mut new_outputs)) => {
                     if changed {
-                        window.emit("on_audio_config_change", {}).unwrap();
+                        log::debug!("Found output devices changed");
+                        app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
+                                             {});
+                    }
+                    if let Some(new_outputs) = new_outputs.take() {
+                        outputs = new_outputs;
                     }
                 }
                 Err(err) => {
                     log::error!("Unable to check audio output devices, err: {}", err);
                 }
             }
-            match check_audio_input_devices() {
-                Ok(changed) => {
+            match check_audio_input_devices(&inputs) {
+                Ok((changed, mut new_inputs)) => {
                     if changed {
-                        window.emit("on_audio_config_change", {}).unwrap();
+                        log::debug!("Found input devices changed");
+                        app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
+                                             {});
+                    }
+                    if let Some(new_inputs) = new_inputs.take() {
+                        inputs = new_inputs;
                     }
                 }
                 Err(err) => {
                     log::error!("Unable to check audio input devices, err: {}", err);
                 }
             }
-            std::thread::sleep(Duration::from_secs(1));
         }
     });
 }

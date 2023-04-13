@@ -14,6 +14,45 @@
   <nz-divider nzType="horizontal"></nz-divider>
   <div *ngIf="type.value === engineTypes.VoiceVox">
     <h4>{{type.value}} 配置</h4>
-    <app-voice-vox-engine [config]="config"></app-voice-vox-engine>
+    <ng-container *ngIf="voicevoxConfigType?.value === voiceVoxConfigTypes.BINARY">
+      <div nz-row>
+        <ng-container *ngIf="voicevoxEngineInitialized">
+          <div nz-col>
+            <nz-alert nzType="success" nzMessage="引擎已加载"></nz-alert>
+          </div>
+        </ng-container>
+        <ng-container *ngIf="!voicevoxEngineInitialized">
+          <ng-container *ngIf="voicevoxEngineLoading">
+            <div nz-col>
+              <ng-template #loadingIconTpl>
+                <nz-spin nzSimple></nz-spin>
+              </ng-template>
+              <ng-template #actionTpl>
+                <button type="button" nz-button nzSize="small" (click)="stopLoadingVoicevox()">停止加载</button>
+              </ng-template>
+              <nz-alert
+                nzShowIcon
+                nzType="info"
+                nzMessage="正在加载引擎"
+                [nzAction]="actionTpl"
+                [nzIcon]="loadingIconTpl"
+              ></nz-alert>
+            </div>
+          </ng-container>
+          <ng-container *ngIf="!voicevoxEngineLoading">
+            <div nz-col>
+              <ng-template #actionTpl>
+                <button type="button" nz-button nzSize="small" (click)="loadVoicevox()">加载</button>
+              </ng-template>
+              <nz-alert nzType="warning"
+                        nzMessage="引擎未加载"
+                        [nzAction]="actionTpl"
+              ></nz-alert>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+    </ng-container>
+    <app-voice-vox-engine [config]="config" [initialized]="voicevoxEngineInitialized"></app-voice-vox-engine>
   </div>
 </form>

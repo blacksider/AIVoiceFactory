@@ -1,20 +1,60 @@
 <ng-container [formGroup]="config">
   <i>配置Voice Vox Engine的API连接和语音配置</i>
   <nz-form-item>
-    <nz-form-label [nzSpan]="24" nzFor="address">API地址</nz-form-label>
-    <nz-form-control nzMd="12" nzXs="24">
-      <nz-input-group [nzAddOnBefore]="protocolTemplate">
-        <ng-template #protocolTemplate>
-          <nz-select id="protocol" name="protocol" formControlName="protocol"
-                     class="protocol-select">
-            <nz-option nzLabel="http://" nzValue="http"></nz-option>
-            <nz-option nzLabel="https://" nzValue="https"></nz-option>
-          </nz-select>
-        </ng-template>
-        <input id="address" name="address" nz-input formControlName="apiAddr"/>
-      </nz-input-group>
+    <nz-form-label [nzSpan]="24" nzFor="config_type">配置类型</nz-form-label>
+    <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+      <nz-select id="config_type" name="config_type"
+                 formControlName="config_type">
+        <nz-option [nzValue]="configTypes.HTTP" nzLabel="HTTP"></nz-option>
+        <nz-option [nzValue]="configTypes.BINARY" nzLabel="程序包"></nz-option>
+      </nz-select>
     </nz-form-control>
   </nz-form-item>
+  <ng-container *ngIf="configType.value === configTypes.HTTP">
+    <nz-form-item>
+      <nz-form-label [nzSpan]="24" nzFor="address">API地址</nz-form-label>
+      <nz-form-control nzMd="12" nzXs="24">
+        <nz-input-group [nzAddOnBefore]="protocolTemplate">
+          <ng-template #protocolTemplate>
+            <nz-select id="protocol" name="protocol" formControlName="protocol"
+                       class="protocol-select">
+              <nz-option nzLabel="http://" nzValue="http"></nz-option>
+              <nz-option nzLabel="https://" nzValue="https"></nz-option>
+            </nz-select>
+          </ng-template>
+          <input id="address" name="address" nz-input formControlName="api_addr"/>
+        </nz-input-group>
+      </nz-form-control>
+    </nz-form-item>
+  </ng-container>
+  <ng-container *ngIf="configType.value === configTypes.BINARY">
+    <nz-form-item>
+      <nz-form-label [nzSpan]="24" nzFor="device">软件类型</nz-form-label>
+      <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+        <nz-select id="device" name="device"
+                   formControlName="device">
+          <nz-option *ngFor="let item of deviceTypes"
+                     nzCustomContent
+                     [nzValue]="item.key"
+                     [nzLabel]="item.label">
+            <span>{{item.label}}</span>
+            <span *ngIf="availableBins[item.key]"
+                  nz-icon
+                  nzType="check-circle"
+                  nzTheme="outline"
+                  class="bin-checked space-left">
+                </span>
+            <span *ngIf="!availableBins[item.key] && device?.value === item.key"
+                  nz-icon
+                  nzType="loading"
+                  nzTheme="outline"
+                  class="space-left">
+                </span>
+          </nz-option>
+        </nz-select>
+      </nz-form-control>
+    </nz-form-item>
+  </ng-container>
   <nz-form-item>
     <nz-form-control [nzSpan]="24">
       <button nz-button nzType="default" nzSize="default" (click)="loadSpeakers()">刷新角色</button>

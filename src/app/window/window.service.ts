@@ -1,8 +1,8 @@
 import {Injectable} from '@angular/core';
-import {BehaviorSubject, Observable, Subject} from 'rxjs';
+import {BehaviorSubject, Observable} from 'rxjs';
 import {fromPromise} from 'rxjs/internal/observable/innerFrom';
 import {invoke} from '@tauri-apps/api';
-import {AudioCacheDetail, AudioCacheIndex} from './audio-data';
+import {AudioCacheDetail, AudioCacheIndex, AudioRegEvent} from './audio-data';
 import {LocalStorageService} from "../local-storage.service";
 
 const KEY_SYNC_STATE = "syncOnTextRecognize";
@@ -11,8 +11,7 @@ const KEY_SYNC_STATE = "syncOnTextRecognize";
   providedIn: 'root'
 })
 export class WindowService {
-  private regTextQueue = new BehaviorSubject<string>("");
-  private audioGenIndex = new Subject<AudioCacheIndex>();
+  private regTextQueue = new BehaviorSubject<AudioRegEvent>(AudioRegEvent.empty());
   private syncOnTextRecognize = false;
 
   constructor(private localStorage: LocalStorageService) {
@@ -55,23 +54,18 @@ export class WindowService {
     return fromPromise<AudioCacheIndex>(invoke<AudioCacheIndex>('generate_audio', {text}));
   }
 
-  listenRegText(): Observable<string> {
+  listenRegText(): Observable<AudioRegEvent> {
     return this.regTextQueue.asObservable();
-  }
-
-  listenAudioIndex(): Observable<AudioCacheIndex> {
-    return this.audioGenIndex.asObservable();
   }
 
   doGenerateAudio(text: string) {
     this.generateAudio(text)
-      .subscribe((res) => {
-        this.audioGenIndex.next(res);
+      .subscribe(() => {
       });
   }
 
   handleRegText(text: string) {
-    this.regTextQueue.next(text);
+    this.regTextQueue.next(AudioRegEvent.new(text, this.syncOnTextRecognize));
     if (this.syncOnTextRecognize) {
       this.doGenerateAudio(text);
     }

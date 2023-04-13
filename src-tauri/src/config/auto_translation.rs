@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,6 @@ enum AutoTranslateTool {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranslateByBaidu {
-    #[serde(rename = "apiAddr")]
     api_addr: String,
     #[serde(rename = "appId")]
     app_id: String,

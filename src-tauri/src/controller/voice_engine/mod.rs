@@ -1,1 +1,1 @@
-pub mod voice_vox;
+pub mod voicevox;

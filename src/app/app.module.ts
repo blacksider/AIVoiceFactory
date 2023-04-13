@@ -33,7 +33,13 @@ import {NzTableModule} from 'ng-zorro-antd/table';
 import {NzResizableModule} from 'ng-zorro-antd/resizable';
 import {IconDefinition} from '@ant-design/icons-angular';
 import {NzIconModule} from 'ng-zorro-antd/icon';
-import {DeleteOutline, PauseCircleOutline, PlayCircleOutline} from '@ant-design/icons-angular/icons';
+import {
+  CheckCircleOutline,
+  DeleteOutline,
+  PauseCircleOutline,
+  PlayCircleOutline,
+  LoadingOutline,
+} from '@ant-design/icons-angular/icons';
 import {VoiceVoxEngineComponent} from './voice-engine/voice-vox-engine/voice-vox-engine.component';
 import {VoiceVoxSpeakerComponent} from './voice-engine/voice-vox-speaker/voice-vox-speaker.component';
 import {NzImageModule} from 'ng-zorro-antd/image';
@@ -41,8 +47,15 @@ import {VoiceRecognitionComponent} from './voice-recognition/voice-recognition.c
 import {KeyRecorderComponent} from './key-recorder/key-recorder.component';
 import {RecordingPopupComponent} from './recording-popup/recording-popup.component';
 import {NzModalModule} from 'ng-zorro-antd/modal';
+import {NzAlertModule} from "ng-zorro-antd/alert";
 
-const icons: IconDefinition[] = [PlayCircleOutline, PauseCircleOutline, DeleteOutline];
+const icons: IconDefinition[] = [
+  PlayCircleOutline,
+  PauseCircleOutline,
+  DeleteOutline,
+  CheckCircleOutline,
+  LoadingOutline
+];
 
 registerLocaleData(en);
 registerLocaleData(zh);
@@ -85,7 +98,8 @@ registerLocaleData(zh);
     NzResizableModule,
     NzIconModule.forRoot(icons),
     NzImageModule,
-    NzModalModule
+    NzModalModule,
+    NzAlertModule
   ],
   providers: [
     {provide: NZ_I18N, useValue: zh_CN},

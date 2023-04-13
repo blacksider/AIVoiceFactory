@@ -6,15 +6,17 @@ use cpal::{Stream, SupportedStreamConfig};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use lazy_static::lazy_static;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, Window, WindowBuilder, WindowUrl, Wry};
+use tokio::sync::Mutex as AsyncMutex;
 
+use crate::common::{app, constants};
 use crate::config::voice_recognition;
 use crate::config::voice_recognition::VoiceRecognitionConfig;
 use crate::controller::{audio_manager, recognizer};
 use crate::controller::errors::{CommonError, ProgramError};
 
 lazy_static! {
-    static ref RECORDER: Arc<Mutex<AudioRecorder>> = Arc::new(Mutex::new(AudioRecorder::new()));
-    static ref RECORDING_POPUP: Arc<Mutex<RecordingPopupHandler>> = Arc::new(Mutex::new(RecordingPopupHandler::new()));
+    static ref RECORDER: Arc<AsyncMutex<AudioRecorder>> = Arc::new(AsyncMutex::new(AudioRecorder::new()));
+    static ref RECORDING_POPUP: Arc<AsyncMutex<RecordingPopupHandler>> = Arc::new(AsyncMutex::new(RecordingPopupHandler::new()));
 }
 
 fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
@@ -125,7 +127,8 @@ impl AudioRecorder {
         let config = device.default_input_config()?;
         self.config = Some(config.clone());
 
-        let err_fn = |err| eprintln!("an error occurred on the stream: {}", err);
+        let err_fn = |err|
+            log::error!("an error occurred on the stream: {}", err);
 
         let buffer = self.buffer.clone();
         let mut buffer = buffer.lock().unwrap();
@@ -193,7 +196,7 @@ impl AudioRecorder {
         Ok(())
     }
 
-    pub fn stop(&mut self) -> Result<Vec<u8>, ProgramError> {
+    pub async fn stop(&mut self) -> Result<Vec<u8>, ProgramError> {
         log::debug!("Stop recording");
         self.should_stop.store(true, Ordering::SeqCst);
         self.stream.as_ref()
@@ -201,7 +204,7 @@ impl AudioRecorder {
             .pause()
             .map_err(|e| format!("Failed to pause stream: {}", e))?;
         self.recording.clone().store(false, Ordering::Release);
-        close_recording_popup();
+        close_recording_popup().await;
 
         let buffer = self.buffer.clone();
         let buffer = buffer.lock().unwrap();
@@ -251,40 +254,33 @@ impl AudioRecorder {
     }
 }
 
-pub fn is_recording() -> bool {
+pub async fn is_recording() -> bool {
     let lock = RECORDER.clone();
-    let recorder = lock.lock().unwrap();
+    let recorder = lock.lock().await;
     return recorder.recording.load(Ordering::Acquire);
 }
 
 pub async fn check_recorder(handle: AppHandle<Wry>) -> Result<String, ProgramError> {
-    let buffer: Result<Option<Vec<u8>>, ProgramError> = tauri::async_runtime::spawn_blocking(move || {
-        let lock = RECORDER.clone();
-        let mut recorder = lock.lock().unwrap();
-        if recorder.recording.load(Ordering::Acquire) {
-            let buffer_res = recorder.stop();
-            match buffer_res {
-                Ok(buffer) => {
-                    Ok(Some(buffer))
-                }
-                Err(err) => {
-                    Err(err)
-                }
+    let lock = RECORDER.clone();
+    let mut recorder = lock.try_lock()
+        .map_err(|_| ProgramError::from("recorder busy, try later"))?;
+    if recorder.recording.load(Ordering::Acquire) {
+        let buffer_res = recorder.stop().await;
+        match buffer_res {
+            Ok(buffer) => {
+                // send to recognizer
+                let text = recognizer::recognize(buffer).await?;
+                return Ok(text);
             }
-        } else {
-            recorder.start()?;
-            open_recording_popup(&handle);
-            Ok(None)
+            Err(err) => {
+                Err(err)
+            }
         }
-    }).await?;
-    let buffer = buffer?;
-
-    if let Some(buffer) = buffer {
-        // send to recognizer
-        let text = recognizer::recognize(buffer).await?;
-        return Ok(text);
+    } else {
+        recorder.start()?;
+        open_recording_popup(&handle).await;
+        Ok("".to_string())
     }
-    Ok("".to_string())
 }
 
 async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError> {
@@ -292,9 +288,8 @@ async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError
         Ok(text) => {
             if !text.is_empty() {
                 log::debug!("Handle recorded text: {}", text);
-                handle.get_window("main").unwrap()
-                    .emit("on_audio_recognize_text", text)
-                    .unwrap();
+                app::silent_emit_all(constants::event::ON_AUDIO_RECOGNIZE_TEXT,
+                                     text);
             }
             Ok(())
         }
@@ -304,19 +299,16 @@ async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError
     }
 }
 
-fn recorder_handler(app: AppHandle<Wry>) {
-    let app_handle = Box::new(app.clone());
-    tauri::async_runtime::spawn(async move {
-        match check_recorder_async( app_handle.app_handle()).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("Unable to check recorder, err: {}", err)
-            }
-        };
-    });
+async fn recorder_handler(app: AppHandle<Wry>) {
+    match check_recorder_async(app.app_handle()).await {
+        Ok(_) => {}
+        Err(err) => {
+            log::error!("Unable to check recorder, err: {}", err)
+        }
+    };
 }
 
-pub fn start_shortcut(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
+pub fn start_shortcut(app: AppHandle<Wry>) -> Result<(), ProgramError> {
     let config = voice_recognition::load_voice_recognition_config()?;
     if config.enable {
         if !config.record_key.is_empty() {
@@ -325,16 +317,20 @@ pub fn start_shortcut(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
             if manager.is_registered(&*key)? {
                 manager.unregister(&*key)?;
             }
-            let app_handle = Box::new(app.clone());
+            let app_handle = Box::new(app.app_handle());
             manager.register(&*key, move || {
-                recorder_handler(app_handle.app_handle());
+                let app_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    recorder_handler(*app_handle).await;
+                });
             })?;
         }
     }
     Ok(())
 }
 
-pub fn update_shortcut(app: &AppHandle<Wry>, original: &VoiceRecognitionConfig, new_config: &VoiceRecognitionConfig) -> Result<(), ProgramError> {
+pub fn update_shortcut(original: &VoiceRecognitionConfig, new_config: &VoiceRecognitionConfig) -> Result<(), ProgramError> {
+    let app = app::get_app_handle()?;
     let mut manager = app.global_shortcut_manager();
 
     // if original registered, unregister it
@@ -351,9 +347,12 @@ pub fn update_shortcut(app: &AppHandle<Wry>, original: &VoiceRecognitionConfig, 
     if new_config.enable {
         if !new_config.record_key.is_empty() {
             let new_key = &*new_config.record_key.clone();
-            let app_handle = Box::new(app.clone());
+            let app_handle = Box::new(app.app_handle());
             manager.register(new_key, move || {
-                recorder_handler(app_handle.app_handle());
+                let app_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    recorder_handler(*app_handle).await;
+                });
             })?;
         }
     }
@@ -392,9 +391,9 @@ impl RecordingPopupHandler {
     }
 }
 
-fn open_recording_popup(app: &AppHandle<Wry>) {
+async fn open_recording_popup(app: &AppHandle<Wry>) {
     let lock = RECORDING_POPUP.clone();
-    let mut handler = lock.lock().unwrap();
+    let mut handler = lock.lock().await;
     if handler.window.is_none() {
         // on the left top
         let window = WindowBuilder::new(
@@ -417,8 +416,8 @@ fn open_recording_popup(app: &AppHandle<Wry>) {
     }
 }
 
-fn close_recording_popup() {
+async fn close_recording_popup() {
     let lock = RECORDING_POPUP.clone();
-    let handler = lock.lock().unwrap();
+    let handler = lock.lock().await;
     handler.close();
 }

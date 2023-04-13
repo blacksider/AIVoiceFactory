@@ -1,33 +1,40 @@
 export class VoiceRecognitionConfig {
-    enable!: boolean;
-    recordKey!: string;
-    tool!: RecognitionTool;
+  enable!: boolean;
+  recordKey!: string;
+  tool!: RecognitionTool;
 }
 
 export abstract class RecognitionTool {
-    type!: string;
+  type!: string;
 }
 
 export class Recognizer {
-    type!: string;
-    name!: string;
+  type!: string;
+  name!: string;
 
-    constructor(type: string, name: string) {
-        this.type = type;
-        this.name = name;
-    }
+  constructor(type: string, name: string) {
+    this.type = type;
+    this.name = name;
+  }
 }
 
 export const RecognizerTypes: { [key: string]: Recognizer } = {
-    Whisper: new Recognizer("Whisper", "Whisper")
+  Whisper: new Recognizer("Whisper", "Whisper")
+};
+
+export const WhisperConfigType = {
+  HTTP: 'Http',
+  BINARY: 'Binary'
 };
 
 export class RecognizeByWhisper extends RecognitionTool {
-    apiAddr!: string;
-    language?: string | null;
+  config_type!: string;
+  use_model!: string;
+  api_addr!: string;
+  language?: string | null;
 
-    constructor() {
-        super();
-        this.type = RecognizerTypes['Whisper'].type;
-    }
+  constructor() {
+    super();
+    this.type = RecognizerTypes['Whisper'].type;
+  }
 }

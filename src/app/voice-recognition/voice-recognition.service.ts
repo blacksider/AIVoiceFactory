@@ -24,6 +24,10 @@ export class VoiceRecognitionService {
   isRecorderRecording(): Observable<boolean> {
     return fromPromise<boolean>(invoke<boolean>('is_recorder_recording'));
   }
+
+  getWhisperAvailableModels(): Observable<string[]> {
+    return fromPromise<string[]>(invoke<string[]>('whisper_available_models'));
+  }
 }
 
 export const voiceRecognitionConfigResolver: ResolveFn<VoiceRecognitionConfig> =
