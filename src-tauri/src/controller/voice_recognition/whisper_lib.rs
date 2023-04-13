@@ -249,8 +249,11 @@ impl WhisperLibrary {
             free(self.get_context()?);
         }
         MODEL_AVAILABLE.store(false, Ordering::Release);
-        self.context.take()
+        let context = self.context.take()
             .ok_or("Cannot set context to none")?;
+        unsafe {
+            std::ptr::drop_in_place(context);
+        }
         log::debug!("Free current whisper model success");
         Ok(())
     }
