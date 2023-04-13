@@ -7,6 +7,8 @@ use reqwest::StatusCode;
 use crate::config::voice_recognition::{RecognitionTool, RecognizeByWhisper, VoiceRecognitionConfig, WhisperConfigType};
 use crate::controller::errors::{CommonError, ProgramError};
 use crate::controller::voice_recognition::whisper_lib;
+pub use crate::controller::voice_recognition::whisper_lib::available_models;
+pub use crate::controller::voice_recognition::whisper_lib::init_library as check_whisper_lib;
 
 const REQ_TASK: &str = "transcribe";
 const REQ_OUTPUT: &str = "txt";
@@ -88,10 +90,6 @@ pub async fn asr(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, P
     }
 }
 
-pub async fn check_whisper_lib() {
-    whisper_lib::init_library().await;
-}
-
 fn get_whisper_lib_model(config: &VoiceRecognitionConfig) -> Option<String> {
     if config.enable {
         match config.tool.clone() {
@@ -105,7 +103,7 @@ fn get_whisper_lib_model(config: &VoiceRecognitionConfig) -> Option<String> {
     None
 }
 
-pub async fn update_model(old: &VoiceRecognitionConfig, current: &VoiceRecognitionConfig) {
+pub async fn update_model(old: &VoiceRecognitionConfig, current: &VoiceRecognitionConfig) -> Option<String> {
     let old_model = get_whisper_lib_model(old);
     let current_model = get_whisper_lib_model(current);
     if current_model.is_none() && old_model.is_some() {
@@ -117,11 +115,15 @@ pub async fn update_model(old: &VoiceRecognitionConfig, current: &VoiceRecogniti
         }
     }
     if current_model.is_some() && old_model != current_model {
-        match whisper_lib::update_model(current_model.unwrap()).await {
-            Ok(_) => {}
+        let update_model = current_model.unwrap();
+        match whisper_lib::update_model(update_model.clone()).await {
+            Ok(_) => {
+                return Some(update_model);
+            }
             Err(err) => {
                 log::error!("Failed to update whisper model, err: {}", err);
             }
         }
     }
+    None
 }

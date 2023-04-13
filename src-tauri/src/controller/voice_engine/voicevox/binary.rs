@@ -14,6 +14,7 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::RwLock as AsyncRwLock;
 use winapi::um::winbase::CREATE_NO_WINDOW;
 
+use crate::common::{app, constants};
 use crate::config::voice_engine::VoiceVoxEngineConfig;
 use crate::controller::errors::ProgramError;
 use crate::utils;
@@ -23,7 +24,7 @@ const DEVICE_CUDA: &str = "cuda";
 const DEVICE_DIRECTML: &str = "directml";
 
 const DATA_DIR: &str = "voicevox";
-const ENGINE_DIR: &str = "voicevox_engine";
+const ENGINE_DIR_PREFIX: &str = "voicevox_engine";
 
 const OUTPUT: &str = "output.log";
 const OUTPUT_ERR: &str = "err.log";
@@ -143,27 +144,7 @@ async fn run_engine_exe<I, S>(exe: String,
     let (interrupted_tx, _) = &*ENGINE_STOP_SIG;
     let mut interrupted_rx = interrupted_tx.subscribe();
 
-    // wait for process exit is a async way
     tokio::select! {
-        response = async {
-            let exit = handle.wait()?;
-            if exit.success() {
-                Ok::<_, ProgramError>(())
-            } else {
-                let code = exit.code().ok_or("exit with no error code")?;
-                Err(ProgramError::from(format!("exit with error code {}", code)))
-            }
-        } => {
-            match response {
-                Ok(_) => {
-                    log::debug!("Voicevox engine stopped unexpectedly");
-                }
-                Err(err) => {
-                    log::error!("Voicevox engine stopped with err: {}", err);
-                }
-            }
-            ENGINE_PROCESS_INITIALIZED.store(false, Ordering::Release);
-        }
         _ = interrupted_rx.recv() => {
             log::debug!("Interrupt voicevox engine signal received");
             match handle.kill() {
@@ -199,7 +180,7 @@ impl EngineProcess {
     fn get_engine_path(&self) -> PathBuf {
         return get_data_path()
             .join(format!("{}_{}",
-                          ENGINE_DIR,
+                          ENGINE_DIR_PREFIX,
                           self.option.as_ref().unwrap().device.clone()));
     }
 
@@ -215,9 +196,6 @@ impl EngineProcess {
             log::debug!("Voicevox engine found, skip download");
             return Ok(());
         }
-
-        // set downloading flag
-        ENGINE_LOADING.store(true, Ordering::Release);
 
         // download binary
         self.download_engine().await
@@ -241,6 +219,10 @@ impl EngineProcess {
         if self.option.is_none() {
             return Err(ProgramError::from("Option should not be none"));
         }
+
+        // set downloading flag
+        ENGINE_LOADING.store(true, Ordering::Release);
+
         let option = self.option.as_ref().unwrap();
         let exe = match &*option.device {
             DEVICE_CPU => DONWLOADER_FILE_CPU,
@@ -288,7 +270,10 @@ impl EngineProcess {
                     }).or_else(|e| {
                         log::debug!("Failed to decompress engine file, err: {}", e);
                         Err(ProgramError::from("Decompress engine file error"))
-                    })?;
+                })?;
+
+                app::silent_emit_all(constants::event::ON_VOICEVOX_ENGINE_LOADED, true);
+
                 log::debug!("Decompress engine file success, decompress folder: {}",
                     decompress_to.to_str().unwrap());
 
@@ -425,9 +410,11 @@ impl BinaryManager {
     async fn stop_engine(&mut self) {
         let (interrupted_tx, _) = &*ENGINE_STOP_SIG;
         match interrupted_tx.send(()) {
-            Ok(_) => {}
+            Ok(_) => {
+                log::debug!("Send voicevox engine stop signal success");
+            }
             Err(err) => {
-                log::error!("Failed to send engine stop signal, err: {}", err);
+                log::error!("Failed to send voicevox engine stop signal, err: {}", err);
             }
         }
     }
@@ -454,12 +441,14 @@ pub async fn stop_loading() {
 }
 
 pub async fn check_and_load(config: VoiceVoxEngineConfig) -> Result<(), ProgramError> {
+    log::debug!("Check and load voicevox binary");
     let lock = BIN_MANGER.clone();
     let mut man = lock.write().await;
     man.set_option(config.device).await
 }
 
 pub async fn check_and_unload() -> Result<(), ProgramError> {
+    log::debug!("Check and unload voicevox binary");
     let lock = BIN_MANGER.clone();
     let mut man = lock.write().await;
     man.stop_engine().await;
@@ -470,4 +459,30 @@ pub async fn get_engine_params() -> EngineParams {
     let lock = ENGINE_PROCESS.clone();
     let p = lock.lock().await;
     p.engine_params.clone()
+}
+
+/// list all binary programs in [DATA_DIR]
+pub fn available_binaries() -> Result<Vec<String>, ProgramError> {
+    let data_path = get_data_path();
+    let mut models = vec![];
+
+    let prefix = ENGINE_DIR_PREFIX.to_string() + "_";
+    let prefix = prefix.as_str();
+    for entry in walkdir::WalkDir::new(data_path)
+        .max_depth(1)
+        .into_iter()
+        .filter_entry(|e| e.file_type().is_dir())
+        .filter_map(|e| e.ok()) {
+        let file_name = entry.file_name().to_str();
+        if file_name.is_some() {
+            let file_name = file_name.unwrap();
+            if file_name.starts_with(prefix) {
+                let mut stripped = file_name.strip_prefix(prefix);
+                if let Some(stripped) = stripped.take() {
+                    models.push(stripped.to_string());
+                }
+            }
+        }
+    }
+    Ok(models)
 }

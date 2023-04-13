@@ -59,6 +59,18 @@
                 <span>{{model.Model}}</span>
                 <span class="space-left">-</span>
                 <span class="space-left">{{model.Disk}}</span>
+                <span *ngIf="whisperAvailableModels[model.Model]"
+                      nz-icon
+                      nzType="check-circle"
+                      nzTheme="outline"
+                      class="model-checked space-left">
+                </span>
+                <span *ngIf="!whisperAvailableModels[model.Model] && whisperUseModel?.value === model.Model"
+                      nz-icon
+                      nzType="loading"
+                      nzTheme="outline"
+                      class="space-left">
+                </span>
               </nz-option>
             </nz-select>
           </nz-form-control>

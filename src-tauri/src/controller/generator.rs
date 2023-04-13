@@ -206,7 +206,7 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
     let config = manager.get_config();
 
     if config.is_voice_vox_config() {
-        let voice_vox_config = config.get_voice_vox_config();
+        let voice_vox_config = config.get_voice_vox_config().unwrap();
         log::debug!("Generating audio by text: {}", translated_text.clone());
         let audio_data = voicevox::gen_audio(&voice_vox_config, translated_text.clone()).await;
         log::debug!("Generate audio cache success");

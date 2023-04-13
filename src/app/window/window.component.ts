@@ -25,6 +25,7 @@ export class WindowComponent implements OnInit, OnDestroy {
   isRecording = false;
 
   private unListenRecorderState?: () => void;
+  private unListenAudioGen?: () => void;
   private windowResize = new Subject<number>();
   private unSub = new Subject();
   private confirmModal?: NzModalRef;
@@ -77,6 +78,8 @@ export class WindowComponent implements OnInit, OnDestroy {
       this.ngZone.run(() => {
         this.audios.unshift(audio);
       });
+    }).then(fn => {
+      this.unListenAudioGen = fn;
     });
     this.voiceRecognitionService.isRecorderRecording().subscribe(ret => {
       this.isRecording = ret;
@@ -95,6 +98,9 @@ export class WindowComponent implements OnInit, OnDestroy {
     this.windowResize.complete();
     if (this.unListenRecorderState) {
       this.unListenRecorderState();
+    }
+    if (this.unListenAudioGen) {
+      this.unListenAudioGen();
     }
     if (this.confirmModal) {
       this.confirmModal.destroy();

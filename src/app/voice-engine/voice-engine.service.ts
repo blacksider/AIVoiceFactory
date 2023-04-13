@@ -96,6 +96,10 @@ export class VoiceEngineService {
   checkVoicevoxEngine(): Observable<any> {
     return fromPromise<any>(invoke<any>('check_voicevox_engine'));
   }
+
+  getVoicevoxAvailableBinaries(): Observable<string[]> {
+    return fromPromise<string[]>(invoke<string[]>('available_voicevox_binaries'));
+  }
 }
 
 export const voiceEngineConfigResolver: ResolveFn<VoiceEngineConfig> =

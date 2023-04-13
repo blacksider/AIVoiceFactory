@@ -33,9 +33,24 @@
       <nz-form-control nzMd="6" nzSm="12" nzXs="24">
         <nz-select id="device" name="device"
                    formControlName="device">
-          <nz-option nzValue="cpu" nzLabel="CPU"></nz-option>
-          <nz-option nzValue="cuda" nzLabel="CUDA"></nz-option>
-          <nz-option nzValue="directml" nzLabel="DirectML"></nz-option>
+          <nz-option *ngFor="let item of deviceTypes"
+                     nzCustomContent
+                     [nzValue]="item.key"
+                     [nzLabel]="item.label">
+            <span>{{item.label}}</span>
+            <span *ngIf="availableBins[item.key]"
+                  nz-icon
+                  nzType="check-circle"
+                  nzTheme="outline"
+                  class="bin-checked space-left">
+                </span>
+            <span *ngIf="!availableBins[item.key] && device?.value === item.key"
+                  nz-icon
+                  nzType="loading"
+                  nzTheme="outline"
+                  class="space-left">
+                </span>
+          </nz-option>
         </nz-select>
       </nz-form-control>
     </nz-form-item>

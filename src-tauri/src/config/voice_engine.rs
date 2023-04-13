@@ -80,10 +80,12 @@ impl VoiceEngineConfig {
         self.engine_type == EngineType::VoiceVox
     }
 
-    pub fn get_voice_vox_config(&self) -> VoiceVoxEngineConfig {
-        match self.clone().config {
-            EngineConfig::VoiceVox(config) => config
-        }
+    pub fn get_voice_vox_config(&self) -> Result<VoiceVoxEngineConfig, ProgramError> {
+        return match self.clone().config {
+            EngineConfig::VoiceVox(config) => {
+                Ok(config)
+            }
+        };
     }
 }
 
@@ -114,12 +116,48 @@ fn load_voice_engine_config() -> Result<VoiceEngineConfig, ProgramError> {
 }
 
 fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ProgramError> {
-    let default_config = config::get_config_raw::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG)?;
-    if default_config.is_none() {
-        gen_default_config()?;
+    let old_config = load_voice_engine_config()?;
+
+    config::save_config(VOICE_ENGINE_CONFIG, config)?;
+
+
+    // unload condition is that current config is no longer voicevox binary config
+    let unload_condition = {
+        if !config.is_voice_vox_config() {
+            true
+        } else {
+            config.get_voice_vox_config()?.config_type != VoiceVoxConfigType::Binary
+        }
+    };
+    if unload_condition {
+        check_and_unload_binary();
         return Ok(());
     }
-    config::save_config(VOICE_ENGINE_CONFIG, config)
+
+    // reload means either change from no binary config to binary config,
+    // or binary config device changed
+    let reload_condition = {
+        if !old_config.is_voice_vox_config() && config.is_voice_vox_config() {
+            true
+        } else if old_config.is_voice_vox_config() && config.is_voice_vox_config() {
+            let pre = old_config.get_voice_vox_config()?;
+            let now = config.get_voice_vox_config()?;
+            if now.config_type == VoiceVoxConfigType::Binary {
+                pre.config_type != VoiceVoxConfigType::Binary ||
+                    pre.device != now.device
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    };
+
+    if reload_condition {
+        check_and_load_binary(config.get_voice_vox_config()?);
+    }
+
+    Ok(())
 }
 
 pub async fn check_voicevox() {
@@ -153,7 +191,7 @@ impl VoiceEngineConfigManager {
 
     pub fn check_voice_vox(&self) {
         if self.config.is_voice_vox_config() {
-            let config = self.config.get_voice_vox_config();
+            let config = self.config.get_voice_vox_config().unwrap();
             match config.config_type {
                 VoiceVoxConfigType::Binary => {
                     check_and_load_binary(config);
@@ -170,7 +208,6 @@ impl VoiceEngineConfigManager {
         match result {
             Ok(_) => {
                 self.config = config;
-                self.check_voice_vox();
                 true
             }
             Err(err) => {

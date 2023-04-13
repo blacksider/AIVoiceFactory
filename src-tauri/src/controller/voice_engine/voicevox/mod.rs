@@ -1,5 +1,9 @@
 use bytes::Bytes;
 
+pub use binary::available_binaries;
+pub use binary::is_initialized as is_binary_initialized;
+pub use binary::is_loading as is_binary_loading;
+pub use binary::stop_loading as stop_binary_loading;
 use model::{VoiceVoxSpeaker, VoiceVoxSpeakerInfo};
 
 use crate::config::voice_engine::{VoiceVoxConfigType, VoiceVoxEngineConfig};
@@ -9,23 +13,13 @@ mod binary;
 mod http;
 pub mod model;
 
-pub fn is_binary_loading() -> bool {
-    binary::is_loading()
-}
-
-pub fn is_binary_initialized() -> bool {
-    binary::is_initialized()
-}
-
-pub async fn stop_binary_loading() {
-    binary::stop_loading().await
-}
-
 pub fn check_and_load_binary(config: VoiceVoxEngineConfig) {
     if config.config_type != VoiceVoxConfigType::Binary {
         return;
     }
+    log::debug!("Check voicevox binary");
     tauri::async_runtime::spawn(async {
+        _check_and_unload_binary().await;
         match binary::check_and_load(config).await {
             Ok(_) => {
                 log::debug!("Check and load voicevox engine success");
@@ -48,16 +42,20 @@ pub fn try_stop_engine_exe() {
     }
 }
 
+async fn _check_and_unload_binary() {
+    match binary::check_and_unload().await {
+        Ok(_) => {
+            log::debug!("Check and unload voicevox engine success");
+        }
+        Err(err) => {
+            log::error!("Check and unload voicevox engine failed, err: {}", err);
+        }
+    }
+}
+
 pub fn check_and_unload_binary() {
     tauri::async_runtime::spawn(async {
-        match binary::check_and_unload().await {
-            Ok(_) => {
-                log::debug!("Check and unload voicevox engine success");
-            }
-            Err(err) => {
-                log::error!("Check and unload voicevox engine failed, err: {}", err);
-            }
-        }
+        _check_and_unload_binary().await
     });
 }
 

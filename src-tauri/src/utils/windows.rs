@@ -84,9 +84,9 @@ pub fn terminate_process(pid: DWORD) -> Result<(), String> {
         return Err(format!("Failed to open process with pid={}", pid));
     }
     let result = unsafe { TerminateProcess(handle, 1) };
-    unsafe { CloseHandle(handle) };
     if result == 0 {
         return Err(format!("Failed to terminate process with pid={}", pid));
     }
+    unsafe { CloseHandle(handle) };
     Ok(())
 }

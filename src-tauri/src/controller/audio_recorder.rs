@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, Window, WindowBuilder, WindowUrl, Wry};
 use tokio::sync::Mutex as AsyncMutex;
 
+use crate::common::{app, constants};
 use crate::config::voice_recognition;
 use crate::config::voice_recognition::VoiceRecognitionConfig;
 use crate::controller::{audio_manager, recognizer};
@@ -287,9 +288,8 @@ async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError
         Ok(text) => {
             if !text.is_empty() {
                 log::debug!("Handle recorded text: {}", text);
-                handle.get_window("main").unwrap()
-                    .emit("on_audio_recognize_text", text)
-                    .unwrap();
+                app::silent_emit_all(constants::event::ON_AUDIO_RECOGNIZE_TEXT,
+                                     text);
             }
             Ok(())
         }
@@ -300,8 +300,7 @@ async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError
 }
 
 async fn recorder_handler(app: AppHandle<Wry>) {
-    let app_handle = Box::new(app.clone());
-    match check_recorder_async(app_handle.app_handle()).await {
+    match check_recorder_async(app.app_handle()).await {
         Ok(_) => {}
         Err(err) => {
             log::error!("Unable to check recorder, err: {}", err)
@@ -309,7 +308,7 @@ async fn recorder_handler(app: AppHandle<Wry>) {
     };
 }
 
-pub fn start_shortcut(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
+pub fn start_shortcut(app: AppHandle<Wry>) -> Result<(), ProgramError> {
     let config = voice_recognition::load_voice_recognition_config()?;
     if config.enable {
         if !config.record_key.is_empty() {
@@ -322,7 +321,7 @@ pub fn start_shortcut(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
             manager.register(&*key, move || {
                 let app_handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    recorder_handler(app_handle.app_handle()).await;
+                    recorder_handler(*app_handle).await;
                 });
             })?;
         }
@@ -330,7 +329,8 @@ pub fn start_shortcut(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
     Ok(())
 }
 
-pub fn update_shortcut(app: &AppHandle<Wry>, original: &VoiceRecognitionConfig, new_config: &VoiceRecognitionConfig) -> Result<(), ProgramError> {
+pub fn update_shortcut(original: &VoiceRecognitionConfig, new_config: &VoiceRecognitionConfig) -> Result<(), ProgramError> {
+    let app = app::get_app_handle()?;
     let mut manager = app.global_shortcut_manager();
 
     // if original registered, unregister it
@@ -351,7 +351,7 @@ pub fn update_shortcut(app: &AppHandle<Wry>, original: &VoiceRecognitionConfig, 
             manager.register(new_key, move || {
                 let app_handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    recorder_handler(app_handle.app_handle()).await;
+                    recorder_handler(*app_handle).await;
                 });
             })?;
         }

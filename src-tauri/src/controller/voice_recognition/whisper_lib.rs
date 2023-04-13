@@ -8,13 +8,27 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use lazy_static::lazy_static;
+use tauri::regex;
 use tokio::sync::{broadcast, Mutex};
 use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::config::voice_recognition;
 use crate::config::voice_recognition::{RecognizeByWhisper, WhisperConfigType};
 use crate::controller::errors::ProgramError;
+use crate::utils;
 use crate::utils::http;
+
+const MODEL_PATH: &str = "whisper/models";
+const MODEL_TMP_FILE: &str = "model.tmp";
+
+const DLL_FILE: &str = "whisper/whisper.dll";
+const DLL_DOWNLOAD_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
+
+lazy_static! {
+    static ref WHISPER_LIB: Arc<Mutex<WhisperLibrary>> = Arc::new(Mutex::new(WhisperLibrary::new()));
+    static ref MODEL_LOAD_STOP_SIG: (Sender<()>, Receiver<()>) = broadcast::channel(1);
+    static ref MODEL_AVAILABLE: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+}
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -120,15 +134,6 @@ pub struct whisper_full_params {
 
 pub const whisper_sampling_strategy_WHISPER_SAMPLING_GREEDY: whisper_sampling_strategy = 0;
 pub const whisper_sampling_strategy_WHISPER_SAMPLING_BEAM_SEARCH: whisper_sampling_strategy = 1;
-
-const DLL_FILE: &str = "whisper/whisper.dll";
-const DLL_DOWNLOAD_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
-
-lazy_static! {
-    static ref WHISPER_LIB: Arc<Mutex<WhisperLibrary>> = Arc::new(Mutex::new(WhisperLibrary::new()));
-    static ref MODEL_LOAD_STOP_SIG: (Sender<()>, Receiver<()>) = broadcast::channel(1);
-    static ref MODEL_AVAILABLE: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-}
 
 pub struct WhisperLibrary {
     inner: libloading::Library,
@@ -246,6 +251,7 @@ impl WhisperLibrary {
         MODEL_AVAILABLE.store(false, Ordering::Release);
         self.context.take()
             .ok_or("Cannot set context to none")?;
+        log::debug!("Free current whisper model success");
         Ok(())
     }
 }
@@ -293,19 +299,29 @@ pub async fn load_model(model: String) -> Result<(), ProgramError> {
     let mut interrupted_rx = interrupted_tx.subscribe();
 
     let model_name = format!("ggml-{}.bin", model);
+    log::debug!("Loading whisper model {}", model_name.clone());
+
+    let model_path = PathBuf::from(MODEL_PATH);
+    std::fs::create_dir_all(model_path.clone())?;
+
+    let download_tmp_file = model_path.join(MODEL_TMP_FILE);
+    let model_file = model_path.join(model_name.clone());
 
     tokio::select! {
         response = async {
-            let model_path = PathBuf::from("whisper/models");
-            let model_file = model_path.join(model_name.clone());
             if !model_file.is_file() {
-                std::fs::create_dir_all(model_path)?;
+                // TODO: try to compare model sha256 to make sure file is ok
                 let download_url = DLL_DOWNLOAD_URL.to_owned() + &*model_name.clone();
                 // download if model not downloaded
-                log::debug!("Downloading mode {} from path [{}]", model_name.clone(), download_url.clone());
+                log::debug!("Downloading whisper model {} from path [{}], download to {}",
+                    model_name.clone(),
+                    download_url.clone(),
+                    download_tmp_file.clone().to_str().unwrap());
 
-                http::download(download_url, model_file.clone()).await?;
+                http::download(download_url, download_tmp_file.clone()).await?;
                 log::debug!("Download model file {} success", model_name.clone());
+                // rename tmp file to actual model file
+                std::fs::rename(download_tmp_file.clone(), model_file.clone())?;
             }
 
             // try to load model
@@ -316,9 +332,11 @@ pub async fn load_model(model: String) -> Result<(), ProgramError> {
             Ok::<_, ProgramError>(())
         } => {
             response?;
+            utils::silent_remove_file(download_tmp_file);
             log::debug!("Load model {} success", model_name);
         }
         _ = interrupted_rx.recv() => {
+            utils::silent_remove_file(download_tmp_file);
             log::debug!("Manually whisper model downloading, stop at downloading model file");
         }
     }
@@ -427,6 +445,36 @@ pub async fn recognize(config: &RecognizeByWhisper, data: Vec<f32>) -> Result<St
     Ok(result)
 }
 
+/// if whisper return text like: \[Music] \[Whisper], it means it is not regular content
+/// of somebody speaking, aka special text
+/// note: whisper lib set special_text=false should work,
+/// but for somehow it is still trying to send back text like this when you give it an empty audio
 fn is_special_text(text: &str) -> bool {
     return text.starts_with("[") && text.ends_with("]");
+}
+
+/// list all models in [MODEL_PATH] that is end with .bin(which is a file suffix of whisper model)
+pub fn available_models() -> Result<Vec<String>, ProgramError> {
+    let model_path = PathBuf::from(MODEL_PATH);
+    let mut models = vec![];
+
+    let file_name_p = regex::Regex::new(r"ggml-(\w+).bin").unwrap();
+
+    for entry in walkdir::WalkDir::new(model_path)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok()) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let file_name = entry.file_name().to_str();
+        if file_name.is_some() {
+            let file_name = file_name.unwrap();
+            if let Some(captures) = file_name_p.captures(file_name) {
+                let name = &captures[1];
+                models.push(name.to_string());
+            }
+        }
+    }
+    Ok(models)
 }

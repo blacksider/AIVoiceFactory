@@ -5,8 +5,8 @@ use std::time::Duration;
 use cpal::Device;
 use cpal::traits::{DeviceTrait, HostTrait};
 use lazy_static::lazy_static;
-use tauri::{Window, Wry};
 
+use crate::common::{app, constants};
 use crate::controller::errors::{CommonError, ProgramError};
 
 lazy_static! {
@@ -302,7 +302,7 @@ fn get_current_inputs_outputs() -> Option<(Vec<String>, Vec<String>)> {
     return Some((inputs.unwrap(), outputs.unwrap()));
 }
 
-pub fn watch_audio_devices(window: Window<Wry>) {
+pub fn watch_audio_devices() {
     log::info!("Start watching audio devices");
     std::thread::spawn(move || {
         loop {
@@ -320,7 +320,8 @@ pub fn watch_audio_devices(window: Window<Wry>) {
                 Ok((changed, mut new_outputs)) => {
                     if changed {
                         log::debug!("Found output devices changed");
-                        window.emit("on_audio_config_change", {}).unwrap();
+                        app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
+                                             {});
                     }
                     if let Some(new_outputs) = new_outputs.take() {
                         outputs = new_outputs;
@@ -334,7 +335,8 @@ pub fn watch_audio_devices(window: Window<Wry>) {
                 Ok((changed, mut new_inputs)) => {
                     if changed {
                         log::debug!("Found input devices changed");
-                        window.emit("on_audio_config_change", {}).unwrap();
+                        app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
+                                             {});
                     }
                     if let Some(new_inputs) = new_inputs.take() {
                         inputs = new_inputs;
