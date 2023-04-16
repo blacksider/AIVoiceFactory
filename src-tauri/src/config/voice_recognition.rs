@@ -37,6 +37,7 @@ pub enum RecognitionTool {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct VoiceRecognitionConfig {
     pub(crate) enable: bool,
+    pub(crate) generate_after: bool,
     #[serde(rename = "recordKey")]
     pub(crate) record_key: String,
     pub(crate) tool: RecognitionTool,
@@ -59,6 +60,7 @@ fn gen_default_config() -> Result<VoiceRecognitionConfig, ProgramError> {
     let empty_str = "".to_string();
     let default_config = VoiceRecognitionConfig {
         enable: false,
+        generate_after: false,
         record_key: "F1".to_string(),
         tool: RecognitionTool::Whisper(RecognizeByWhisper {
             config_type: WhisperConfigType::Http,

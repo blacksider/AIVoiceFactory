@@ -5,33 +5,13 @@ import {invoke} from '@tauri-apps/api';
 import {AudioCacheDetail, AudioCacheIndex, AudioRegEvent} from './audio-data';
 import {LocalStorageService} from "../local-storage.service";
 
-const KEY_SYNC_STATE = "syncOnTextRecognize";
-
 @Injectable({
   providedIn: 'root'
 })
 export class WindowService {
   private regTextQueue = new BehaviorSubject<AudioRegEvent>(AudioRegEvent.empty());
-  private syncOnTextRecognize = false;
 
   constructor(private localStorage: LocalStorageService) {
-    const storedSyncState = this.localStorage.get(KEY_SYNC_STATE);
-    if (!!storedSyncState) {
-      this.syncOnTextRecognize = new Boolean(storedSyncState).valueOf();
-    }
-  }
-
-  getSyncOnTextState(): boolean {
-    return this.syncOnTextRecognize;
-  }
-
-  updateSyncOnTextState(value: boolean) {
-    this.syncOnTextRecognize = value;
-    if (this.syncOnTextRecognize) {
-      this.localStorage.set(KEY_SYNC_STATE, "true");
-    } else {
-      this.localStorage.set(KEY_SYNC_STATE, "");
-    }
   }
 
   listAudios(): Observable<AudioCacheIndex[]> {
@@ -58,16 +38,7 @@ export class WindowService {
     return this.regTextQueue.asObservable();
   }
 
-  doGenerateAudio(text: string) {
-    this.generateAudio(text)
-      .subscribe(() => {
-      });
-  }
-
   handleRegText(text: string) {
-    this.regTextQueue.next(AudioRegEvent.new(text, this.syncOnTextRecognize));
-    if (this.syncOnTextRecognize) {
-      this.doGenerateAudio(text);
-    }
+    this.regTextQueue.next(AudioRegEvent.new(text));
   }
 }

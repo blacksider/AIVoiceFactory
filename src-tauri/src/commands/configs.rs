@@ -4,7 +4,7 @@ use crate::config::auto_translation::AutoTranslationConfig;
 use crate::config::voice_engine::VoiceEngineConfig;
 use crate::config::voice_recognition::VoiceRecognitionConfig;
 use crate::controller::{audio_manager, audio_recorder};
-use crate::controller::audio_manager::AudioConfigResponseData;
+use crate::controller::audio_manager::{AudioConfigResponseData, AudioSelection, StreamConfig};
 use crate::controller::voice_recognition::whisper;
 
 #[tauri::command]
@@ -82,13 +82,59 @@ pub async fn save_voice_recognition_config(config: VoiceRecognitionConfig) -> bo
 }
 
 #[tauri::command]
-pub fn get_audio_config() -> Option<AudioConfigResponseData> {
-    match audio_manager::get_audio_config() {
+pub async fn get_audio_config() -> Option<AudioConfigResponseData> {
+    match audio_manager::get_audio_config().await {
         Ok(data) => {
             return Some(data);
         }
         Err(err) => {
             log::error!("Failed to load audio config, err: {}", err);
+        }
+    }
+    None
+}
+
+#[tauri::command]
+pub async fn change_output_device(selection: AudioSelection) -> Option<AudioConfigResponseData> {
+    match audio_manager::change_output_device(selection).await {
+        Ok(data) => {
+            return Some(data);
+        }
+        Err(err) => {
+            log::error!("Failed to change audio output device, err: {}", err);
+        }
+    }
+    None
+}
+
+#[tauri::command]
+pub async fn change_input_device(selection: AudioSelection) -> Option<AudioConfigResponseData> {
+    match audio_manager::change_input_device(selection).await {
+        Ok(data) => {
+            match audio_manager::restart_mic_streaming().await {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("Failed to restart mic streaming, err: {}", err);
+                    return None;
+                }
+            }
+            return Some(data);
+        }
+        Err(err) => {
+            log::error!("Failed to change audio input device, err: {}", err);
+        }
+    }
+    None
+}
+
+#[tauri::command]
+pub async fn change_stream_config(stream: StreamConfig) -> Option<AudioConfigResponseData> {
+    match audio_manager::change_stream_config(stream).await {
+        Ok(data) => {
+            return Some(data);
+        }
+        Err(err) => {
+            log::error!("Failed to change stream config, err: {}", err);
         }
     }
     None

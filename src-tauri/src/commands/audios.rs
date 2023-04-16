@@ -3,9 +3,7 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::common::{app, constants};
-use crate::controller::{audio_manager, audio_recorder, generator};
-use crate::controller::audio_manager::{AudioConfigResponseData, AudioSelection};
+use crate::controller::{audio_recorder, generator};
 use crate::controller::generator::{AudioCacheDetail, AudioCacheIndex};
 
 lazy_static! {
@@ -79,49 +77,7 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
         }
     }
     log::debug!("Call cmd generate audio by text: {}", text.clone());
-    let mut audio_index = generator::generate_audio(text).await;
-    if let Some(index) = audio_index.take() {
-        // TODO emit audio list change event
-        app::silent_emit_all(constants::event::ON_AUDIO_GENERATED, index.clone());
-        match generator::play_audio(index.name.clone()) {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("Cannot play audio {}, err: {}",
-                            index.name.clone(),
-                        err)
-            }
-        }
-        log::debug!("Generated index: {:?}", index.clone());
-        return Some(index);
-    }
-    None
-}
-
-
-#[tauri::command]
-pub fn change_output_device(selection: AudioSelection) -> Option<AudioConfigResponseData> {
-    match audio_manager::change_output_device(selection) {
-        Ok(data) => {
-            return Some(data);
-        }
-        Err(err) => {
-            log::error!("Failed to change audio output device, err: {}", err);
-        }
-    }
-    None
-}
-
-#[tauri::command]
-pub fn change_input_device(selection: AudioSelection) -> Option<AudioConfigResponseData> {
-    match audio_manager::change_input_device(selection) {
-        Ok(data) => {
-            return Some(data);
-        }
-        Err(err) => {
-            log::error!("Failed to change audio input device, err: {}", err);
-        }
-    }
-    None
+    generator::generate_audio(text).await
 }
 
 #[tauri::command]

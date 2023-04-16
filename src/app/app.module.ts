@@ -36,9 +36,11 @@ import {NzIconModule} from 'ng-zorro-antd/icon';
 import {
   CheckCircleOutline,
   DeleteOutline,
-  PauseCircleOutline,
-  PlayCircleOutline,
+  EyeInvisibleOutline,
+  EyeOutline,
   LoadingOutline,
+  PauseCircleOutline,
+  PlayCircleOutline
 } from '@ant-design/icons-angular/icons';
 import {VoiceVoxEngineComponent} from './voice-engine/voice-vox-engine/voice-vox-engine.component';
 import {VoiceVoxSpeakerComponent} from './voice-engine/voice-vox-speaker/voice-vox-speaker.component';
@@ -54,7 +56,9 @@ const icons: IconDefinition[] = [
   PauseCircleOutline,
   DeleteOutline,
   CheckCircleOutline,
-  LoadingOutline
+  LoadingOutline,
+  EyeInvisibleOutline,
+  EyeOutline
 ];
 
 registerLocaleData(en);

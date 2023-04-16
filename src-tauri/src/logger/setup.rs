@@ -23,7 +23,13 @@ pub fn setup_logger() {
     // define log levels
     let global_log_level = LevelFilter::Debug;
     let stdout_log_level = LevelFilter::Debug;
-    let logfile_log_level = LevelFilter::Info;
+    let logfile_log_level;
+    if cfg!(debug_assertions) {
+        // on dev mode, set file log to debug as well
+        logfile_log_level = LevelFilter::Debug;
+    } else {
+        logfile_log_level = LevelFilter::Info;
+    }
 
     // define log pattern
     let log_pattern = "{d(%Y-%m-%d %H:%M:%S)} | {({l}):5.5} | {f}:{L} — {m}{n}";

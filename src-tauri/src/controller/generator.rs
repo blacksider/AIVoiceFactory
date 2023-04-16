@@ -10,6 +10,7 @@ use rodio::{Decoder, OutputStream, Sink};
 use sled::{IVec, Transactional};
 use sled::transaction::ConflictableTransactionError;
 
+use crate::common::{app, constants};
 use crate::config::config::DB_MANAGER;
 use crate::config::voice_engine;
 use crate::controller::{audio_manager, translator};
@@ -198,6 +199,7 @@ fn save_audio(source: String, translated: String, audio: Bytes) -> Result<AudioC
     Ok(cache_index)
 }
 
+
 /// generate audio content and it's temporary wav content, and return current cache name
 pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
     let translated = translator::translate(text.clone()).await;
@@ -219,6 +221,11 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
                 match save {
                     Ok(index) => {
                         log::debug!("Generate audio cache with index: {}", index.name.clone());
+                        // send event
+                        app::silent_emit_all(constants::event::ON_AUDIO_GENERATED, index.clone());
+                        // play generated silently
+                        play_audio_silently(index.name.clone());
+                        log::debug!("Generated index: {:?}", index.clone());
                         return Some(index);
                     }
                     Err(err) => {
@@ -234,6 +241,17 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
     None
 }
 
+fn play_audio_silently(index: String) {
+    match play_audio(index.clone()) {
+        Ok(_) => {
+            log::debug!("Play audio {} silently success", index);
+        }
+        Err(err) => {
+            log::error!("Cannot play audio {}, err: {}", index, err)
+        }
+    }
+}
+
 pub fn play_audio(index: String) -> Result<bool, ProgramError> {
     let data_tree = DB_MANAGER.clone().db.open_tree(AUDIO_DATA_TREE_DATA)?;
     let cache = data_tree.get(index.into_bytes())?;
@@ -243,7 +261,7 @@ pub fn play_audio(index: String) -> Result<bool, ProgramError> {
         if !playing {
             mutex.store(true, Ordering::Relaxed);
             tauri::async_runtime::spawn(async move {
-                match play_encoded_audio(&encoded) {
+                match play_encoded_audio(&encoded).await {
                     Ok(_) => {}
                     Err(err) => {
                         log::error!("Unable to play encoded audio, err: {}", err)
@@ -258,10 +276,10 @@ pub fn play_audio(index: String) -> Result<bool, ProgramError> {
     }
 }
 
-fn play_wav_audio(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
+async fn play_wav_audio(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
     let cursor = Cursor::new(wav_bytes);
     let source = Decoder::new(cursor)?;
-    let output_device = audio_manager::get_output_device()?;
+    let output_device = audio_manager::get_output_device().await?;
     let (_stream, stream_handle) = OutputStream::try_from_device(&output_device)?;
     let sink = Sink::try_new(&stream_handle)?;
     sink.append(source);
@@ -270,9 +288,33 @@ fn play_wav_audio(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
     Ok(())
 }
 
-fn play_encoded_audio(encoded: &IVec) -> Result<(), ProgramError> {
+fn play_to_vb_audio_cable(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
+    let cursor = Cursor::new(wav_bytes);
+    let source = Decoder::new(cursor)?;
+    let output_device = audio_manager::get_vb_audio_cable_output()?;
+    let (_stream, stream_handle) = OutputStream::try_from_device(&output_device)?;
+    let sink = Sink::try_new(&stream_handle)?;
+    sink.append(source);
+    sink.play();
+    sink.sleep_until_end();
+    Ok(())
+}
+
+async fn play_encoded_audio(encoded: &IVec) -> Result<(), ProgramError> {
     let decoded: AudioCache = bincode::deserialize(&encoded)?;
     let wav_bytes = decoded.audio;
-    play_wav_audio(wav_bytes)
+    if audio_manager::is_stream_input_enabled().await {
+        let wav_bytes = wav_bytes.clone();
+        std::thread::spawn(|| {
+            match play_to_vb_audio_cable(wav_bytes) {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("Failed to play by VB audio cable, err: {}", err);
+                }
+            }
+        });
+    }
+    play_wav_audio(wav_bytes).await?;
+    Ok(())
 }
 

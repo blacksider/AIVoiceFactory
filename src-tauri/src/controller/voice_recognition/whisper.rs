@@ -13,13 +13,17 @@ pub use crate::controller::voice_recognition::whisper_lib::init_library as check
 const REQ_TASK: &str = "transcribe";
 const REQ_OUTPUT: &str = "txt";
 
-async fn asr_by_http(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, ProgramError> {
+async fn asr_by_http(config: &RecognizeByWhisper, samples: Vec<f32>) -> Result<String, ProgramError> {
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();
 
     headers.insert("Content-Type", "multipart/form-data".parse().unwrap());
     headers.insert("Accept", "application/json".parse().unwrap());
+
+    let data = unsafe {
+        std::slice::from_raw_parts(samples.as_ptr() as *const _, samples.len() * 4)
+    };
 
     let form = Form::new()
         .part("audio_file", Part::bytes(data).file_name("asr.wav"));
@@ -47,21 +51,7 @@ async fn asr_by_http(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<Strin
 }
 
 // convert source wav to 16khz if it is not
-fn convert_wav_16k(wav: Vec<f32>, spec: hound::WavSpec) -> Result<Vec<f32>, ProgramError> {
-    if spec.sample_rate != 16000 {
-        samplerate::convert(spec.sample_rate,
-                            16000,
-                            spec.channels as usize,
-                            samplerate::ConverterType::SincBestQuality,
-                            &wav)
-            .map_err(|err| ProgramError::from(err))
-    } else {
-        Ok(wav)
-    }
-}
-
-async fn asr_by_lib(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, ProgramError> {
-    log::debug!("Do ast by whisper library");
+fn convert_wav_16k(data: Vec<u8>) -> Result<Vec<f32>, ProgramError> {
     let mut buffer = Cursor::new(data);
     let reader = hound::WavReader::new(&mut buffer).unwrap();
     let spec = reader.spec();
@@ -74,18 +64,53 @@ async fn asr_by_lib(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String
         samples.push(x?);
     }
 
-    // try to convert to 16k
-    let samples = convert_wav_16k(samples, spec)?;
+    let mono_samples: Vec<f32>;
+    match spec.channels {
+        1 => {
+            mono_samples = samples;
+        }
+        2 => {
+            let mut converted = Vec::new();
+            for i in (0..samples.len()).step_by(2) {
+                let left = samples[i];
+                let right = samples[i + 1];
+                let mono_sample = (left + right) / 2.0;
+                converted.push(mono_sample);
+            }
+            mono_samples = converted;
+        }
+        ch => {
+            return Err(ProgramError::from(format!("unsupported input channel {}", ch)));
+        }
+    }
+
+    if spec.sample_rate != 16000 {
+        samplerate::convert(spec.sample_rate,
+                            16000,
+                            1,
+                            samplerate::ConverterType::SincBestQuality,
+                            &mono_samples)
+            .map_err(|err| ProgramError::from(err))
+    } else {
+        Ok(mono_samples)
+    }
+}
+
+async fn asr_by_lib(config: &RecognizeByWhisper, samples: Vec<f32>) -> Result<String, ProgramError> {
+    log::debug!("Do ast by whisper library");
     whisper_lib::recognize(config, samples).await
 }
 
 pub async fn asr(config: &RecognizeByWhisper, data: Vec<u8>) -> Result<String, ProgramError> {
+    // try to convert to 16k
+    let samples = convert_wav_16k(data)?;
+
     match config.config_type {
         WhisperConfigType::Http => {
-            asr_by_http(config, data).await
+            asr_by_http(config, samples).await
         }
         WhisperConfigType::Binary => {
-            asr_by_lib(config, data).await
+            asr_by_lib(config, samples).await
         }
     }
 }

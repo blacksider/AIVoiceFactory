@@ -11,7 +11,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use crate::common::{app, constants};
 use crate::config::voice_recognition;
 use crate::config::voice_recognition::VoiceRecognitionConfig;
-use crate::controller::{audio_manager, recognizer};
+use crate::controller::{audio_manager, generator, recognizer};
 use crate::controller::errors::{CommonError, ProgramError};
 
 lazy_static! {
@@ -119,11 +119,11 @@ impl AudioRecorder {
         }
     }
 
-    pub fn start(&mut self) -> Result<(), ProgramError> {
+    pub async fn start(&mut self) -> Result<(), ProgramError> {
         log::debug!("Start recording");
         self.should_stop.store(false, Ordering::SeqCst);
 
-        let device = audio_manager::get_input_device()?;
+        let device = audio_manager::get_input_device().await?;
         let config = device.default_input_config()?;
         self.config = Some(config.clone());
 
@@ -277,7 +277,7 @@ pub async fn check_recorder(handle: AppHandle<Wry>) -> Result<String, ProgramErr
             }
         }
     } else {
-        recorder.start()?;
+        recorder.start().await?;
         open_recording_popup(&handle).await;
         Ok("".to_string())
     }
@@ -287,9 +287,13 @@ async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError
     match check_recorder(handle.app_handle()).await {
         Ok(text) => {
             if !text.is_empty() {
-                log::debug!("Handle recorded text: {}", text);
+                log::debug!("Handle recorded text: {}", text.clone());
                 app::silent_emit_all(constants::event::ON_AUDIO_RECOGNIZE_TEXT,
-                                     text);
+                                     text.clone());
+                let config = voice_recognition::load_voice_recognition_config()?;
+                if config.generate_after {
+                    generator::generate_audio(text.clone()).await;
+                }
             }
             Ok(())
         }

@@ -134,6 +134,9 @@ fn main() {
             commands::configs::get_voice_recognition_config,
             commands::configs::save_voice_recognition_config,
             commands::configs::get_audio_config,
+            commands::configs::change_output_device,
+            commands::configs::change_input_device,
+            commands::configs::change_stream_config,
 
             commands::voicevox::is_voicevox_engine_initialized,
             commands::voicevox::is_loading_voicevox_engine,
@@ -148,8 +151,6 @@ fn main() {
             commands::audios::delete_audio,
             commands::audios::play_audio,
             commands::audios::generate_audio,
-            commands::audios::change_output_device,
-            commands::audios::change_input_device,
             commands::audios::is_recorder_recording,
 
             commands::whisper::whisper_available_models,

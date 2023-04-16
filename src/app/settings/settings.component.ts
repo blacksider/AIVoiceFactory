@@ -53,12 +53,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   private initAudioOutputs(): void {
-    this.audioOutputs = [new SelectDefault()];
+    this.audioOutputs = [new SelectDefault(this.audioConfig.default_output_device)];
     if (this.audioConfig?.output_devices?.length > 0) {
       this.audioConfig.output_devices.forEach(value => {
-        const selByName = new SelectByName();
-        selByName.name = value;
-        this.audioOutputs.push(selByName)
+        this.audioOutputs.push(new SelectByName(value))
       });
     }
     this.selectAudioOutput = this.audioOutputs[0];
@@ -73,12 +71,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   private initAudioInputs(): void {
-    this.audioInputs = [new SelectDefault()];
+    this.audioInputs = [new SelectDefault(this.audioConfig.default_input_device)];
     if (this.audioConfig?.input_devices?.length > 0) {
       this.audioConfig.input_devices.forEach(value => {
-        const selByName = new SelectByName();
-        selByName.name = value;
-        this.audioInputs.push(selByName)
+        this.audioInputs.push(new SelectByName(value))
       });
     }
     this.selectAudioInput = this.audioInputs[0];
@@ -111,6 +107,15 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   getDeviceLabel(device: AudioSelection): string {
-    return device instanceof SelectByName ? device.name : '默认设备';
+    return device instanceof SelectByName ? device.name : `默认设备[${device.name}]`;
+  }
+
+  onChangeStreamConfig() {
+    this.service.changeStreamConfig(this.audioConfig.stream)
+      .subscribe(config => {
+        this.audioConfig = config;
+        this.initAudioOutputs();
+        this.initAudioInputs();
+      });
   }
 }

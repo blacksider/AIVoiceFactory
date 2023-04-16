@@ -1,93 +1,102 @@
 <form nz-form [formGroup]="configForm">
-  <nz-form-item nz-row class="register-area">
+  <nz-form-item nz-row>
     <nz-form-control [nzSpan]="24">
       <label nz-checkbox id="enable" name="enable" formControlName="enable">
         <span>启用</span>
       </label>
     </nz-form-control>
   </nz-form-item>
-  <nz-form-item *ngIf="enable.value === true">
-    <nz-form-label [nzSpan]="24" nzFor="recordKey">录音快捷键</nz-form-label>
-    <nz-form-control nzMd="6" nzSm="12" nzXs="24">
-      <app-key-recorder id="recordKey" name="recordKey" formControlName="recordKey"></app-key-recorder>
-    </nz-form-control>
-  </nz-form-item>
-  <ng-container *ngIf="enable.value === true" formGroupName="tool">
-    <nz-form-item>
-      <nz-form-label [nzSpan]="24" nzFor="type">识别器</nz-form-label>
-      <nz-form-control nzMd="6" nzSm="12" nzXs="24">
-        <nz-select id="type" name="type"
-                   formControlName="type">
-          <nz-option *ngFor="let type of recognizers"
-                     [nzValue]="type"
-                     [nzLabel]="recognizerTypes[type].name"></nz-option>
-        </nz-select>
+  <ng-container *ngIf="enable.value === true">
+    <nz-form-item nz-row>
+      <nz-form-control [nzSpan]="24">
+        <label nz-checkbox id="generate_after" name="generate_after" formControlName="generate_after">
+          <span>识别后自动生成语音</span>
+        </label>
       </nz-form-control>
     </nz-form-item>
-    <div *ngIf="type.value === recognizerTypes['Whisper'].type">
-      <nz-divider nzType="horizontal"></nz-divider>
-      <h4>Whisper</h4>
+    <nz-form-item>
+      <nz-form-label [nzSpan]="24" nzFor="recordKey">录音快捷键</nz-form-label>
+      <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+        <app-key-recorder id="recordKey" name="recordKey" formControlName="recordKey"></app-key-recorder>
+      </nz-form-control>
+    </nz-form-item>
+    <ng-container formGroupName="tool">
       <nz-form-item>
-        <nz-form-label [nzSpan]="24" nzFor="config_type">类型</nz-form-label>
+        <nz-form-label [nzSpan]="24" nzFor="type">识别器</nz-form-label>
         <nz-form-control nzMd="6" nzSm="12" nzXs="24">
-          <nz-select id="config_type" name="config_type"
-                     formControlName="config_type">
-            <nz-option [nzValue]="whisperConfigTypes.HTTP" nzLabel="HTTP"></nz-option>
-            <nz-option [nzValue]="whisperConfigTypes.BINARY" nzLabel="程序"></nz-option>
+          <nz-select id="type" name="type"
+                     formControlName="type">
+            <nz-option *ngFor="let type of recognizers"
+                       [nzValue]="type"
+                       [nzLabel]="recognizerTypes[type].name"></nz-option>
           </nz-select>
         </nz-form-control>
       </nz-form-item>
-      <ng-container *ngIf="whisperConfigType.value === whisperConfigTypes.HTTP">
+      <div *ngIf="type.value === recognizerTypes['Whisper'].type">
+        <nz-divider nzType="horizontal"></nz-divider>
+        <h4>Whisper</h4>
         <nz-form-item>
-          <nz-form-label [nzSpan]="24" nzFor="api_addr">地址</nz-form-label>
-          <nz-form-control nzMd="12" nzXs="24">
-            <input id="api_addr" name="api_addr" nz-input
-                   formControlName="api_addr"/>
-          </nz-form-control>
-        </nz-form-item>
-      </ng-container>
-      <ng-container *ngIf="whisperConfigType.value === whisperConfigTypes.BINARY">
-        <nz-form-item>
-          <nz-form-label [nzSpan]="24" nzFor="use_model">模型</nz-form-label>
+          <nz-form-label [nzSpan]="24" nzFor="config_type">类型</nz-form-label>
           <nz-form-control nzMd="6" nzSm="12" nzXs="24">
-            <nz-select id="use_model" name="use_model"
-                       formControlName="use_model">
-              <nz-option *ngFor="let model of whisperModels"
-                         nzCustomContent
-                         [nzValue]="model.Model"
-                         [nzLabel]="model.Model">
-                <span>{{model.Model}}</span>
-                <span class="space-left">-</span>
-                <span class="space-left">{{model.Disk}}</span>
-                <span *ngIf="whisperAvailableModels[model.Model]"
-                      nz-icon
-                      nzType="check-circle"
-                      nzTheme="outline"
-                      class="model-checked space-left">
-                </span>
-                <span *ngIf="!whisperAvailableModels[model.Model] && whisperUseModel?.value === model.Model"
-                      nz-icon
-                      nzType="loading"
-                      nzTheme="outline"
-                      class="space-left">
-                </span>
-              </nz-option>
+            <nz-select id="config_type" name="config_type"
+                       formControlName="config_type">
+              <nz-option [nzValue]="whisperConfigTypes.HTTP" nzLabel="HTTP"></nz-option>
+              <nz-option [nzValue]="whisperConfigTypes.BINARY" nzLabel="程序"></nz-option>
             </nz-select>
           </nz-form-control>
         </nz-form-item>
-      </ng-container>
-      <nz-form-item>
-        <nz-form-label [nzSpan]="24" nzFor="from">语言</nz-form-label>
-        <nz-form-control nzMd="6" nzSm="12" nzXs="24">
-          <nz-select id="language" name="language"
-                     formControlName="language"
-                     [nzShowSearch]="true">
-            <nz-option *ngFor="let lan of whisperLanguageTypes"
-                       [nzValue]="lan"
-                       [nzLabel]="whisperLanguages[lan]"></nz-option>
-          </nz-select>
-        </nz-form-control>
-      </nz-form-item>
-    </div>
+        <ng-container *ngIf="whisperConfigType.value === whisperConfigTypes.HTTP">
+          <nz-form-item>
+            <nz-form-label [nzSpan]="24" nzFor="api_addr">地址</nz-form-label>
+            <nz-form-control nzMd="12" nzXs="24">
+              <input id="api_addr" name="api_addr" nz-input
+                     formControlName="api_addr"/>
+            </nz-form-control>
+          </nz-form-item>
+        </ng-container>
+        <ng-container *ngIf="whisperConfigType.value === whisperConfigTypes.BINARY">
+          <nz-form-item>
+            <nz-form-label [nzSpan]="24" nzFor="use_model">模型</nz-form-label>
+            <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+              <nz-select id="use_model" name="use_model"
+                         formControlName="use_model">
+                <nz-option *ngFor="let model of whisperModels"
+                           nzCustomContent
+                           [nzValue]="model.Model"
+                           [nzLabel]="model.Model">
+                  <span>{{model.Model}}</span>
+                  <span class="space-left">-</span>
+                  <span class="space-left">{{model.Disk}}</span>
+                  <span *ngIf="whisperAvailableModels[model.Model]"
+                        nz-icon
+                        nzType="check-circle"
+                        nzTheme="outline"
+                        class="model-checked space-left">
+                </span>
+                  <span *ngIf="!whisperAvailableModels[model.Model] && whisperUseModel?.value === model.Model"
+                        nz-icon
+                        nzType="loading"
+                        nzTheme="outline"
+                        class="space-left">
+                </span>
+                </nz-option>
+              </nz-select>
+            </nz-form-control>
+          </nz-form-item>
+        </ng-container>
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzFor="from">语言</nz-form-label>
+          <nz-form-control nzMd="6" nzSm="12" nzXs="24">
+            <nz-select id="language" name="language"
+                       formControlName="language"
+                       [nzShowSearch]="true">
+              <nz-option *ngFor="let lan of whisperLanguageTypes"
+                         [nzValue]="lan"
+                         [nzLabel]="whisperLanguages[lan]"></nz-option>
+            </nz-select>
+          </nz-form-control>
+        </nz-form-item>
+      </div>
+    </ng-container>
   </ng-container>
 </form>

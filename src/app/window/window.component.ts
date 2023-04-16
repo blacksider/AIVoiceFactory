@@ -21,7 +21,6 @@ export class WindowComponent implements OnInit, OnDestroy {
   audios: AudioCacheIndex[] = [];
   audioDetails: { [key: string]: AudioCacheDetail };
   resizeFrame = -1;
-  syncOnTextRecognize = false;
   isRecording = false;
 
   private unListenRecorderState?: () => void;
@@ -66,7 +65,6 @@ export class WindowComponent implements OnInit, OnDestroy {
     } else {
       this.siderWidth = this.currentWindowSize / 2;
     }
-    this.syncOnTextRecognize = this.service.getSyncOnTextState();
     this.loadAudios();
     this.service.listenRegText()
       .pipe(takeUntil(this.unSub))
@@ -150,10 +148,6 @@ export class WindowComponent implements OnInit, OnDestroy {
   playAudio(index: string) {
     this.service.playAudio(index).subscribe(() => {
     });
-  }
-
-  onSyncValueChange() {
-    this.service.updateSyncOnTextState(this.syncOnTextRecognize);
   }
 
   removeAudio(item: AudioCacheIndex) {
