@@ -29,7 +29,7 @@ export class VoiceVoxEngineComponent implements OnInit, OnChanges, OnDestroy {
   deviceTypes: DeviceType[] = [
     {key: "cpu", label: "CPU"},
     {key: "cuda", label: "CUDA"},
-    {key: "directml", label: "CPU"},
+    {key: "directml", label: "DirectML"},
   ];
 
   private unListenBinLoad?: () => void;

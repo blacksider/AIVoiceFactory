@@ -1,5 +1,6 @@
 use std::io::Cursor;
 
+use hound::SampleFormat;
 use reqwest::header::HeaderMap;
 use reqwest::multipart::{Form, Part};
 use reqwest::StatusCode;
@@ -58,10 +59,24 @@ fn convert_wav_16k(data: Vec<u8>) -> Result<Vec<f32>, ProgramError> {
     // Collect the samples from the reader into a Vec<f32>
     log::debug!("Convert wav to 16k from {:?}{}", spec.sample_format, spec.bits_per_sample);
     // read samples as f32
-    // TODO: is this always f32?
+    let sample_format = spec.sample_format;
+    let bits_per_sample = spec.bits_per_sample;
     let mut samples = Vec::new();
-    for x in reader.into_samples::<f32>() {
-        samples.push(x?);
+    match sample_format {
+        SampleFormat::Float => {
+            for x in reader.into_samples::<f32>() {
+                samples.push(x?);
+            }
+        }
+        SampleFormat::Int => {
+            // if is int, convert to f32
+            for sample in reader.into_samples::<i32>() {
+                let sample = sample? as f32;
+                let max = (1u32 << bits_per_sample) - 1;
+                let float_sample = sample / (max as f32);
+                samples.push(float_sample);
+            }
+        }
     }
 
     let mono_samples: Vec<f32>;

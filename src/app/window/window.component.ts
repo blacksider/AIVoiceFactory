@@ -116,10 +116,7 @@ export class WindowComponent implements OnInit, OnDestroy {
 
   generate() {
     this.service.generateAudio(this.inputMessage)
-      .subscribe((res) => {
-        if (!!res) {
-          this.audios.unshift(res);
-        }
+      .subscribe((_) => {
       });
   }
 

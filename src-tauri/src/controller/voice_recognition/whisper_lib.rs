@@ -74,10 +74,10 @@ pub struct whisper_token_data {
     pub vlen: f32,
 }
 
-pub type whisper_encoder_begin_callback = std::option::Option<
+pub type whisper_encoder_begin_callback = Option<
     unsafe extern "C" fn(ctx: *mut whisper_context, user_data: *mut std::os::raw::c_void) -> bool,
 >;
-pub type whisper_logits_filter_callback = std::option::Option<
+pub type whisper_logits_filter_callback = Option<
     unsafe extern "C" fn(
         ctx: *mut whisper_context,
         tokens: *const whisper_token_data,
@@ -401,15 +401,14 @@ pub async fn recognize(config: &RecognizeByWhisper, data: Vec<f32>) -> Result<St
 
     wparams.translate = false;
 
-    let lan: CString;
-    if config.language.is_some() {
+    let lan: CString = if config.language.is_some() {
         let language = config.language.clone().unwrap();
-        lan = CString::new(language)
-            .map_err(|_| "unable to parse string to cstring")?;
+        CString::new(language)
+            .map_err(|_| "unable to parse string to cstring")?
     } else {
-        lan = CString::new("".as_bytes())
-            .map_err(|_| "unable to parse string to cstring")?;
-    }
+        CString::new("".as_bytes())
+            .map_err(|_| "unable to parse string to cstring")?
+    };
 
     wparams.language = lan.as_ptr();
 
