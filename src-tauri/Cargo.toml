@@ -54,3 +54,13 @@ winapi = { version = "0.3.9", features = ["memoryapi", "psapi", "winsvc", "winus
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 
+[lib]
+name = "project_lib"
+path = "src/lib.rs"
+
+[dev-dependencies]
+criterion = "0.4.0"
+
+[[bench]]
+name = "encrypt_benchmark"
+harness = false

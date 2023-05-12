@@ -13,7 +13,7 @@ use crate::controller::voice_engine::voicevox;
 use crate::controller::voice_recognition::whisper;
 
 mod logger;
-mod cypher;
+pub mod cypher;
 mod config;
 mod commands;
 mod controller;
@@ -122,7 +122,7 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             log::info!("Application started");
-            common::app::set_app_handle(app.app_handle());
+            app::set_app_handle(app.app_handle());
             setup(app)?;
             Ok(())
         })

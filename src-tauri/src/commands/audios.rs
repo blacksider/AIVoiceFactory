@@ -72,11 +72,11 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
     match lock {
         Ok(_) => {}
         Err(_) => {
-            log::debug!("Generate audio is executing");
+            log::info!("Generate audio is executing");
             return None;
         }
     }
-    log::debug!("Call cmd generate audio by text: {}", text.clone());
+    log::info!("Call cmd generate audio by text: {}", text.clone());
     generator::generate_audio(text).await
 }
 

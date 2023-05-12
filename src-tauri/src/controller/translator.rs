@@ -6,9 +6,11 @@ pub async fn translate(text: String) -> Option<String> {
     let config = manager.get_config();
     let (translate, by_baidu) = config.translated_by_baidu();
     if !translate {
+        log::info!("Translate not enabled, skip");
         return None;
     }
     if let Some(baidu_config) = by_baidu {
+        log::info!("Translate by baidu, text: {}", text.clone());
         let result = baidu_translation::translate(&baidu_config, text)
             .await;
         match result {
@@ -16,7 +18,7 @@ pub async fn translate(text: String) -> Option<String> {
                 return Some(translated);
             }
             Err(err) => {
-                log::error!("Failed to generate voice vox audio, err: {}", err);
+                log::error!("Failed to translate text, err: {}", err);
             }
         }
     }
