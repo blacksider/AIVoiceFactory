@@ -38,7 +38,7 @@ pub async fn save_auto_translation_config(config: AutoTranslationConfig) -> Opti
 #[tauri::command]
 pub async fn get_voice_recognition_config() -> Option<VoiceRecognitionConfig> {
     let manager =
-        voice_recognition::VOICE_REC_CONFIG_MANAGER.lock().await;
+        voice_recognition::VOICE_REC_CONFIG_MANAGER.read().await;
     Some(manager.get_config())
 }
 
@@ -55,7 +55,8 @@ pub async fn save_voice_recognition_config(config: VoiceRecognitionConfig) -> bo
     let old_config = old_config.unwrap();
 
     let mut manager = voice_recognition::VOICE_REC_CONFIG_MANAGER
-        .lock().await;
+        .write()
+        .await;
     let success = manager.save_config(config.clone());
 
     if success {

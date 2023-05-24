@@ -4,12 +4,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use cpal::{BufferSize, Device, SizedSample, Stream, StreamConfig, SupportedStreamConfig};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use lazy_static::lazy_static;
+use tokio::sync::Mutex as AsyncMutex;
 
 use crate::controller::errors::{CommonError, ProgramError};
 
 lazy_static! {
     static ref STREAM_AUDIO: Arc<Mutex<StreamAudio>> = Arc::new(Mutex::new(StreamAudio::new()));
     static ref RUNNING: AtomicBool = AtomicBool::new(false);
+    pub static ref LISTENER: Arc<AsyncMutex<Listener>> = Arc::new(AsyncMutex::new(Listener::new(30 * 1000)));
 }
 
 pub struct StreamAudio {

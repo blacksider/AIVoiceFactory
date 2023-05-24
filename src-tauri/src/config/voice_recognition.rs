@@ -1,4 +1,4 @@
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use lazy_static::lazy_static;
 
@@ -8,7 +8,7 @@ use crate::controller::errors::ProgramError;
 static RECOGNITION_CONFIG: &str = "voice_recognition";
 
 lazy_static! {
-    pub static ref VOICE_REC_CONFIG_MANAGER: Mutex<VoiceRecognitionConfigManager> = Mutex::new(VoiceRecognitionConfigManager::init());
+    pub static ref VOICE_REC_CONFIG_MANAGER: RwLock<VoiceRecognitionConfigManager> = RwLock::new(VoiceRecognitionConfigManager::init());
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]

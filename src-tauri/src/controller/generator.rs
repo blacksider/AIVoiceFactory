@@ -30,7 +30,14 @@ lazy_static! {
             tauri::async_runtime::block_on(async move {
                 while let Some(index) = rx.recv().await {
                     log::debug!("Accept play audio event of index {}", index.clone());
-                    play_audio(index).await;
+                    match play_audio(index.clone()).await {
+                        Ok(_) => {
+                        }
+                        Err(err) => {
+                            log::error!("Cannot play audio of index {} from event, err: {}",
+                                index.clone(), err)
+                        }
+                    }
                 }
             });
         });
