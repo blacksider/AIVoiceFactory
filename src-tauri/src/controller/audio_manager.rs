@@ -557,60 +557,58 @@ fn get_current_inputs_outputs() -> Option<(Vec<String>, String, Vec<String>, Str
                  outputs.unwrap(), default_output.unwrap()));
 }
 
-pub fn watch_audio_devices() {
+pub async fn watch_audio_devices() {
     log::info!("Start watching audio devices");
-    tauri::async_runtime::spawn(async {
-        loop {
-            let mut inputs: Option<Vec<String>> = None;
-            let mut default_input: Option<String> = None;
-            let mut outputs: Option<Vec<String>> = None;
-            let mut default_output: Option<String> = None;
-            if let Some((_inputs, _default_input, _outputs, _default_output)) = get_current_inputs_outputs() {
-                inputs.replace(_inputs);
-                default_input.replace(_default_input);
-                outputs.replace(_outputs);
-                default_output.replace(_default_output);
-            } else {
-                std::thread::sleep(Duration::from_secs(1));
-                continue;
-            }
+    loop {
+        let mut inputs: Option<Vec<String>> = None;
+        let mut default_input: Option<String> = None;
+        let mut outputs: Option<Vec<String>> = None;
+        let mut default_output: Option<String> = None;
+        if let Some((_inputs, _default_input, _outputs, _default_output)) = get_current_inputs_outputs() {
+            inputs.replace(_inputs);
+            default_input.replace(_default_input);
+            outputs.replace(_outputs);
+            default_output.replace(_default_output);
+        } else {
             std::thread::sleep(Duration::from_secs(1));
-            match check_audio_output_devices(
-                outputs.as_ref().unwrap(),
-                default_output.as_ref().unwrap().clone()).await {
-                Ok((changed, mut new_outputs)) => {
-                    if changed {
-                        log::debug!("Found output devices changed");
-                        app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
-                                             {});
-                    }
-                    if let Some((new_outputs, new_default)) = new_outputs.take() {
-                        outputs.replace(new_outputs);
-                        default_output.replace(new_default);
-                    }
+            continue;
+        }
+        std::thread::sleep(Duration::from_secs(1));
+        match check_audio_output_devices(
+            outputs.as_ref().unwrap(),
+            default_output.as_ref().unwrap().clone()).await {
+            Ok((changed, mut new_outputs)) => {
+                if changed {
+                    log::debug!("Found output devices changed");
+                    app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
+                                         {});
                 }
-                Err(err) => {
-                    log::error!("Unable to check audio output devices, err: {}", err);
+                if let Some((new_outputs, new_default)) = new_outputs.take() {
+                    outputs.replace(new_outputs);
+                    default_output.replace(new_default);
                 }
             }
-            match check_audio_input_devices(
-                inputs.as_ref().unwrap(),
-                default_input.as_ref().unwrap().clone()).await {
-                Ok((changed, mut new_inputs)) => {
-                    if changed {
-                        log::debug!("Found input devices changed");
-                        app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
-                                             {});
-                    }
-                    if let Some((new_inputs, new_default)) = new_inputs.take() {
-                        inputs.replace(new_inputs);
-                        default_input.replace(new_default);
-                    }
-                }
-                Err(err) => {
-                    log::error!("Unable to check audio input devices, err: {}", err);
-                }
+            Err(err) => {
+                log::error!("Unable to check audio output devices, err: {}", err);
             }
         }
-    });
+        match check_audio_input_devices(
+            inputs.as_ref().unwrap(),
+            default_input.as_ref().unwrap().clone()).await {
+            Ok((changed, mut new_inputs)) => {
+                if changed {
+                    log::debug!("Found input devices changed");
+                    app::silent_emit_all(constants::event::ON_AUDIO_CONFIG_CHANGE,
+                                         {});
+                }
+                if let Some((new_inputs, new_default)) = new_inputs.take() {
+                    inputs.replace(new_inputs);
+                    default_input.replace(new_default);
+                }
+            }
+            Err(err) => {
+                log::error!("Unable to check audio input devices, err: {}", err);
+            }
+        }
+    }
 }

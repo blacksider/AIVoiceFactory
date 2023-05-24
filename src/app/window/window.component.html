@@ -40,7 +40,7 @@
         </ng-template>
         <nz-collapse>
           <nz-collapse-panel *ngFor="let item of audios"
-                             nzHeader="{{item.name}}  {{item.time | date: 'dd/MM/yy HH:mm'}}"
+                             nzHeader="{{item.time | date: 'yyyy-MM-dd HH:mm:ss'}}"
                              [nzExtra]="itemExtra"
                              [nzActive]="item.active"
                              (nzActiveChange)="onExpandItem($event, item)">

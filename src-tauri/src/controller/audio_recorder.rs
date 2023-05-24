@@ -1,96 +1,23 @@
-use std::io::Cursor;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use cpal::{Stream, SupportedStreamConfig};
-use cpal::traits::{DeviceTrait, StreamTrait};
 use lazy_static::lazy_static;
 use tauri::{AppHandle, GlobalShortcutManager, Manager, Window, WindowBuilder, WindowUrl, Wry};
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::common::{app, constants};
+use crate::audio::talk;
+use crate::audio::talk::TalkParams;
+use crate::common::app;
 use crate::config::voice_recognition;
 use crate::config::voice_recognition::VoiceRecognitionConfig;
-use crate::controller::{audio_manager, generator, recognizer};
-use crate::controller::errors::{CommonError, ProgramError};
+use crate::controller::errors::ProgramError;
 
 lazy_static! {
     static ref RECORDER: Arc<AsyncMutex<AudioRecorder>> = Arc::new(AsyncMutex::new(AudioRecorder::new()));
     static ref RECORDING_POPUP: Arc<AsyncMutex<RecordingPopupHandler>> = Arc::new(AsyncMutex::new(RecordingPopupHandler::new()));
 }
 
-fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
-    if format.is_float() {
-        hound::SampleFormat::Float
-    } else {
-        hound::SampleFormat::Int
-    }
-}
-
-fn wav_spec_from_config(config: &SupportedStreamConfig) -> hound::WavSpec {
-    hound::WavSpec {
-        channels: config.channels() as _,
-        sample_rate: config.sample_rate().0 as _,
-        bits_per_sample: (config.sample_format().sample_size() * 8) as _,
-        sample_format: sample_format(config.sample_format()),
-    }
-}
-
-enum BufferType {
-    I8,
-    I16,
-    I32,
-    F32,
-}
-
-struct BufferWrapper {
-    buffer_type: BufferType,
-    vi8: Vec<i8>,
-    vi16: Vec<i16>,
-    vi32: Vec<i32>,
-    vf32: Vec<f32>,
-}
-
-impl BufferWrapper {
-    fn new() -> Self {
-        Self {
-            buffer_type: BufferType::I8,
-            vi8: vec![],
-            vi16: vec![],
-            vi32: vec![],
-            vf32: vec![],
-        }
-    }
-
-    fn clear(&mut self) {
-        self.vi8.clear();
-        self.vi16.clear();
-        self.vi32.clear();
-        self.vf32.clear();
-    }
-
-    fn extend_from_i8_slice(&mut self, other: &[i8]) {
-        self.vi8.extend_from_slice(other);
-    }
-
-    fn extend_from_i16_slice(&mut self, other: &[i16]) {
-        self.vi16.extend_from_slice(other);
-    }
-
-    fn extend_from_i32_slice(&mut self, other: &[i32]) {
-        self.vi32.extend_from_slice(other);
-    }
-
-    fn extend_from_f32_slice(&mut self, other: &[f32]) {
-        self.vf32.extend_from_slice(other);
-    }
-}
-
 struct AudioRecorder {
-    buffer: Arc<Mutex<BufferWrapper>>,
-    stream: Option<Stream>,
-    config: Option<SupportedStreamConfig>,
-    should_stop: Arc<AtomicBool>,
     recording: Arc<AtomicBool>,
 }
 
@@ -98,159 +25,32 @@ unsafe impl Send for AudioRecorder {}
 
 unsafe impl Sync for AudioRecorder {}
 
-fn check_buffer_type(sample_format: &cpal::SampleFormat) -> BufferType {
-    match *sample_format {
-        cpal::SampleFormat::I8 => BufferType::I8,
-        cpal::SampleFormat::I16 => BufferType::I16,
-        cpal::SampleFormat::I32 => BufferType::I32,
-        cpal::SampleFormat::F32 => BufferType::F32,
-        _ => BufferType::I8
-    }
-}
-
 impl AudioRecorder {
     pub fn new() -> Self {
         Self {
-            buffer: Arc::new(Mutex::new(BufferWrapper::new())),
-            stream: None,
-            config: None,
-            should_stop: Arc::new(AtomicBool::new(false)),
             recording: Arc::new(AtomicBool::new(false)),
         }
     }
 
     pub async fn start(&mut self) -> Result<(), ProgramError> {
         log::debug!("Start recording");
-        self.should_stop.store(false, Ordering::SeqCst);
 
-        let device = audio_manager::get_input_device().await?;
-        let config = device.default_input_config()?;
-        self.config = Some(config.clone());
+        talk::start(&TalkParams::default()).await?;
 
-        let err_fn = |err|
-            log::error!("an error occurred on the stream: {}", err);
-
-        let buffer = self.buffer.clone();
-        let mut buffer = buffer.lock().unwrap();
-        buffer.buffer_type = check_buffer_type(&config.sample_format());
-        buffer.clear();
-        drop(buffer);
-
-        let buffer = self.buffer.clone();
-        let should_stop = self.should_stop.clone();
-
-        let stream = match config.sample_format() {
-            cpal::SampleFormat::I8 => device.build_input_stream(
-                &config.into(),
-                move |data: &[i8], _: &_| {
-                    if !should_stop.load(Ordering::SeqCst) {
-                        let mut buffer = buffer.lock().unwrap();
-                        buffer.extend_from_i8_slice(data);
-                    }
-                },
-                err_fn,
-                None,
-            )?,
-            cpal::SampleFormat::I16 => device.build_input_stream(
-                &config.into(),
-                move |data: &[i16], _: &_| {
-                    if !should_stop.load(Ordering::SeqCst) {
-                        let mut buffer = buffer.lock().unwrap();
-                        buffer.extend_from_i16_slice(data);
-                    }
-                },
-                err_fn,
-                None,
-            )?,
-            cpal::SampleFormat::I32 => device.build_input_stream(
-                &config.into(),
-                move |data: &[i32], _: &_| {
-                    if !should_stop.load(Ordering::SeqCst) {
-                        let mut buffer = buffer.lock().unwrap();
-                        buffer.extend_from_i32_slice(data);
-                    }
-                },
-                err_fn,
-                None,
-            )?,
-            cpal::SampleFormat::F32 => device.build_input_stream(
-                &config.into(),
-                move |data: &[f32], _: &_| {
-                    if !should_stop.load(Ordering::SeqCst) {
-                        let mut buffer = buffer.lock().unwrap();
-                        buffer.extend_from_f32_slice(data);
-                    }
-                },
-                err_fn,
-                None,
-            )?,
-            sample_format => {
-                return Err(ProgramError::wrap(CommonError::new(format!("Unsupported sample format '{}'", sample_format))));
-            }
-        };
-
-        self.stream = Some(stream);
-        self.stream.as_ref().unwrap().play().map_err(|e| format!("Failed to start stream: {}", e))?;
         self.recording.clone().store(true, Ordering::Release);
 
         Ok(())
     }
 
-    pub async fn stop(&mut self) -> Result<Vec<u8>, ProgramError> {
+    // pub async fn stop(&mut self) -> Result<Vec<u8>, ProgramError> {
+    pub fn stop(&mut self) -> Result<(), ProgramError> {
         log::debug!("Stop recording");
-        self.should_stop.store(true, Ordering::SeqCst);
-        self.stream.as_ref()
-            .ok_or_else(|| "Unable to get stream reference")?
-            .pause()
-            .map_err(|e| format!("Failed to pause stream: {}", e))?;
+
+        talk::stop()?;
+
         self.recording.clone().store(false, Ordering::Release);
-        close_recording_popup().await;
 
-        let buffer = self.buffer.clone();
-        let buffer = buffer.lock().unwrap();
-        let spec = wav_spec_from_config(self.config.as_ref().unwrap());
-        let mut cursor = Cursor::new(Vec::new());
-        let cursor_ref = &mut cursor;
-        let mut writer = hound::WavWriter::new(cursor_ref, spec)
-            .map_err(|e| format!("Failed to create wav writer: {}", e))?;
-
-        match buffer.buffer_type {
-            BufferType::I8 => {
-                log::debug!("extend data i8, total {}", buffer.vi8.len());
-                for &data in buffer.vi8.iter() {
-                    writer
-                        .write_sample(data)
-                        .map_err(|e| format!("Failed to write sample: {}", e))?;
-                }
-            }
-            BufferType::I16 => {
-                log::debug!("extend data i16, total {}", buffer.vi16.len());
-                for &data in buffer.vi16.iter() {
-                    writer
-                        .write_sample(data)
-                        .map_err(|e| format!("Failed to write sample: {}", e))?;
-                }
-            }
-            BufferType::I32 => {
-                log::debug!("extend data i32, total {}", buffer.vi32.len());
-                for &data in buffer.vi32.iter() {
-                    writer
-                        .write_sample(data)
-                        .map_err(|e| format!("Failed to write sample: {}", e))?;
-                }
-            }
-            BufferType::F32 => {
-                log::debug!("extend data f32, total {}", buffer.vf32.len());
-                for &data in buffer.vf32.iter() {
-                    writer
-                        .write_sample(data)
-                        .map_err(|e| format!("Failed to write sample: {}", e))?;
-                }
-            }
-        }
-        writer.finalize().map_err(|e| format!("Failed to finalize wav file: {}", e))?;
-        log::debug!("Write all buffer, cursor at {}", cursor.position());
-        Ok(cursor.into_inner())
+        Ok(())
     }
 }
 
@@ -260,47 +60,20 @@ pub async fn is_recording() -> bool {
     return recorder.recording.load(Ordering::Acquire);
 }
 
-pub async fn check_recorder(handle: AppHandle<Wry>) -> Result<String, ProgramError> {
+async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError> {
     let lock = RECORDER.clone();
     let mut recorder = lock.try_lock()
         .map_err(|_| ProgramError::from("recorder busy, try later"))?;
     if recorder.recording.load(Ordering::Acquire) {
-        let buffer_res = recorder.stop().await;
-        match buffer_res {
-            Ok(buffer) => {
-                // send to recognizer
-                let text = recognizer::recognize(buffer).await?;
-                return Ok(text);
-            }
-            Err(err) => {
-                Err(err)
-            }
-        }
+        // if is recording, stop
+        recorder.stop()?;
+        close_recording_popup().await?;
     } else {
+        //
         recorder.start().await?;
-        open_recording_popup(&handle).await;
-        Ok("".to_string())
+        open_recording_popup(&handle).await?;
     }
-}
-
-async fn check_recorder_async(handle: AppHandle<Wry>) -> Result<(), ProgramError> {
-    match check_recorder(handle.app_handle()).await {
-        Ok(text) => {
-            if !text.is_empty() {
-                log::debug!("Handle recorded text: {}", text.clone());
-                app::silent_emit_all(constants::event::ON_AUDIO_RECOGNIZE_TEXT,
-                                     text.clone());
-                let config = voice_recognition::load_voice_recognition_config()?;
-                if config.generate_after {
-                    generator::generate_audio(text.clone()).await;
-                }
-            }
-            Ok(())
-        }
-        Err(err) => {
-            Err(err)
-        }
-    }
+    Ok(())
 }
 
 async fn recorder_handler(app: AppHandle<Wry>) {
@@ -378,24 +151,25 @@ impl RecordingPopupHandler {
         self.window = Some(window);
     }
 
-    fn display(&self) {
+    fn display(&self) -> Result<(), ProgramError> {
         if self.window.is_none() {
-            return;
+            return Err(ProgramError::from("Init popup window first"));
         }
         let w = self.window.as_ref().unwrap();
-        w.show().expect("Cannot display recording popup");
+        w.show()?;
+        Ok(())
     }
 
-    fn close(&self) {
+    fn close(&self) -> Result<(), ProgramError> {
         if self.window.is_none() {
-            return;
+            return Err(ProgramError::from("Init popup window first"));
         }
-        self.window.as_ref().unwrap().hide()
-            .expect("Cannot close recording popup");
+        self.window.as_ref().ok_or("Failed to get window reference")?.hide()?;
+        Ok(())
     }
 }
 
-async fn open_recording_popup(app: &AppHandle<Wry>) {
+async fn open_recording_popup(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
     let lock = RECORDING_POPUP.clone();
     let mut handler = lock.lock().await;
     if handler.window.is_none() {
@@ -407,21 +181,20 @@ async fn open_recording_popup(app: &AppHandle<Wry>) {
             .resizable(false)
             .disable_file_drop_handler()
             .transparent(true)
-            .inner_size(150.0, 30.0)
+            .min_inner_size(50.0, 30.0)
+            .max_inner_size(250.0, 300.0)
             .position(10.0, 10.0)
             .always_on_top(true)
             .skip_taskbar(true)
             .decorations(false)
-            .build()
-            .expect("failed to create recording popup window");
+            .build()?;
         handler.set_window(window);
-    } else {
-        handler.display();
     }
+    handler.display()
 }
 
-async fn close_recording_popup() {
+async fn close_recording_popup() -> Result<(), ProgramError> {
     let lock = RECORDING_POPUP.clone();
     let handler = lock.lock().await;
-    handler.close();
+    handler.close()
 }

@@ -33,6 +33,8 @@ import {NzTableModule} from 'ng-zorro-antd/table';
 import {NzResizableModule} from 'ng-zorro-antd/resizable';
 import {IconDefinition} from '@ant-design/icons-angular';
 import {NzIconModule} from 'ng-zorro-antd/icon';
+import {NzTimelineModule} from 'ng-zorro-antd/timeline';
+
 import {
   CheckCircleOutline,
   DeleteOutline,
@@ -103,7 +105,8 @@ registerLocaleData(zh);
     NzIconModule.forRoot(icons),
     NzImageModule,
     NzModalModule,
-    NzAlertModule
+    NzAlertModule,
+    NzTimelineModule
   ],
   providers: [
     {provide: NZ_I18N, useValue: zh_CN},

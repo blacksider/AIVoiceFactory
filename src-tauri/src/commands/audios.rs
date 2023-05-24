@@ -1,14 +1,5 @@
-use std::sync::Arc;
-
-use lazy_static::lazy_static;
-use tokio::sync::Mutex as AsyncMutex;
-
 use crate::controller::{audio_recorder, generator};
 use crate::controller::generator::{AudioCacheDetail, AudioCacheIndex};
-
-lazy_static! {
-    static ref GEN_AUDIO_LOCK: Arc<AsyncMutex<()>> = Arc::new(AsyncMutex::new(()));
-}
 
 #[tauri::command]
 pub fn list_audios() -> Option<Vec<AudioCacheIndex>> {
@@ -53,8 +44,8 @@ pub fn delete_audio(index: String) -> Option<bool> {
 
 
 #[tauri::command]
-pub fn play_audio(index: String) -> Option<bool> {
-    match generator::play_audio(index) {
+pub async fn play_audio(index: String) -> Option<bool> {
+    match generator::play_audio(index).await {
         Ok(data) => {
             return Some(data);
         }
@@ -68,16 +59,15 @@ pub fn play_audio(index: String) -> Option<bool> {
 
 #[tauri::command]
 pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
-    let lock = GEN_AUDIO_LOCK.try_lock();
-    match lock {
-        Ok(_) => {}
-        Err(_) => {
-            log::info!("Generate audio is executing");
-            return None;
-        }
-    }
     log::info!("Call cmd generate audio by text: {}", text.clone());
-    generator::generate_audio(text).await
+    let index = generator::generate_audio(text).await;
+    if let Some(cache) = index {
+        // play generated silently
+        generator::play_audio_silently(cache.name.clone());
+        Some(cache)
+    } else {
+        None
+    }
 }
 
 #[tauri::command]

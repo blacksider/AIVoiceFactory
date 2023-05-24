@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 pub mod http;
 pub mod windows;
+pub mod audio;
 
 /// app home dir is current exe path
 pub fn get_app_home_dir() -> PathBuf {

@@ -191,7 +191,7 @@ impl WhisperLibrary {
         Ok(params)
     }
 
-    fn whisper_full(&self, wav: Vec<f32>,
+    fn whisper_full(&self, wav: &Vec<f32>,
                     params: whisper_full_params) -> Result<std::os::raw::c_int, ProgramError> {
         let whisper_full: libloading::Symbol<unsafe extern "C" fn(
             *mut whisper_context,
@@ -294,6 +294,7 @@ pub async fn init_library() {
 }
 
 pub async fn load_model(model: String) -> Result<(), ProgramError> {
+    log::debug!("Load whisper model: {}", model.clone());
     // lock download file by lib lock
     let lock = WHISPER_LIB.clone();
     let mut lib = lock.lock().await;
@@ -380,7 +381,7 @@ pub async fn update_model(model: String) -> Result<(), ProgramError> {
     Ok(())
 }
 
-pub async fn recognize(config: &RecognizeByWhisper, data: Vec<f32>) -> Result<String, ProgramError> {
+pub async fn recognize(config: &RecognizeByWhisper, data: &Vec<f32>) -> Result<String, ProgramError> {
     if !MODEL_AVAILABLE.load(Ordering::Acquire) {
         return Err(ProgramError::from("Whisper model is not loaded"));
     }
@@ -398,7 +399,8 @@ pub async fn recognize(config: &RecognizeByWhisper, data: Vec<f32>) -> Result<St
     wparams.print_progress = false;
     wparams.print_timestamps = false;
     wparams.print_special = false;
-
+    wparams.no_context = true;
+    wparams.single_segment = true;
     wparams.translate = false;
 
     let lan: CString = if config.language.is_some() {
@@ -413,19 +415,10 @@ pub async fn recognize(config: &RecognizeByWhisper, data: Vec<f32>) -> Result<St
     wparams.language = lan.as_ptr();
 
     wparams.n_threads = 8;
-    wparams.n_max_text_ctx = -1;
-    wparams.offset_ms = 0;
-    wparams.duration_ms = 0;
-    wparams.token_timestamps = false;
-    wparams.thold_pt = 0.01;
-    wparams.split_on_word = false;
     wparams.speed_up = false;
     wparams.greedy.best_of = 5;
-    wparams.beam_search.beam_size = -1;
-    wparams.entropy_thold = 2.40;
-    wparams.logprob_thold = -1.00;
-
-    log::debug!("Recognize data by whisper library");
+    // TODO why choose 768?
+    wparams.audio_ctx = 768;
 
     let result = lib.whisper_full(data, wparams)?;
     if result != 0 {
@@ -439,6 +432,7 @@ pub async fn recognize(config: &RecognizeByWhisper, data: Vec<f32>) -> Result<St
         result.push_str(&*text);
     }
 
+    // FIXME: remove later
     if is_special_text(result.trim()) {
         log::debug!("Whisper segment text is special text {}, skip", result.clone());
         return Ok(String::new());
