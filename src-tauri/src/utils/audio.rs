@@ -1,6 +1,6 @@
 /// convert source samples to mono samples if source is duo-channels.
-/// assume source channel is 2, the data is like [l, r, l, r...]
-/// all we need to do is average every [l, r] data
+/// assume source channel is 2, the data is like \[l, r, l, r...]
+/// all we need to do is average every \[l, r] data
 pub fn convert_to_mono(samples: &Vec<f32>, channels: u16) -> Vec<f32> {
     let mut converted = Vec::new();
     for i in (0..samples.len()).step_by(channels as usize) {

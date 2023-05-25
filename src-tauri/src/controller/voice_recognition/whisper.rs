@@ -51,7 +51,7 @@ async fn asr_by_http(config: &RecognizeByWhisper, samples: &Vec<f32>) -> Result<
 
 async fn asr_by_lib(config: &RecognizeByWhisper, samples: &Vec<f32>) -> Result<String, ProgramError> {
     log::debug!("Do ast by whisper library");
-    whisper_lib::recognize(config, samples).await
+    whisper_lib::recognize(config.language.clone(), samples).await
 }
 
 async fn asr_16k_mono(config: &RecognizeByWhisper,

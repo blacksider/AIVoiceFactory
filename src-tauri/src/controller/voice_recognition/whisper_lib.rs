@@ -9,11 +9,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use lazy_static::lazy_static;
 use tauri::regex;
+use tauri::regex::Regex;
 use tokio::sync::{broadcast, Mutex};
 use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::config::voice_recognition;
-use crate::config::voice_recognition::{RecognizeByWhisper, WhisperConfigType};
+use crate::config::voice_recognition::WhisperConfigType;
 use crate::controller::errors::ProgramError;
 use crate::utils;
 use crate::utils::http;
@@ -30,6 +31,7 @@ lazy_static! {
     static ref MODEL_AVAILABLE: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 }
 
+// declaration of whisper structs and constants
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct whisper_context {
@@ -134,7 +136,9 @@ pub struct whisper_full_params {
 
 pub const whisper_sampling_strategy_WHISPER_SAMPLING_GREEDY: whisper_sampling_strategy = 0;
 pub const whisper_sampling_strategy_WHISPER_SAMPLING_BEAM_SEARCH: whisper_sampling_strategy = 1;
+// ^^^^^^ declaration of whisper structs and constants end
 
+/// whisper library wrapper
 pub struct WhisperLibrary {
     inner: libloading::Library,
     context: Option<*mut whisper_context>,
@@ -201,12 +205,14 @@ impl WhisperLibrary {
         ) -> std::os::raw::c_int> = unsafe {
             self.inner.get(b"whisper_full\0")?
         };
+
         let result = unsafe {
             whisper_full(self.get_context()?,
                          params,
                          wav.as_ptr(),
                          wav.len() as std::os::raw::c_int)
         };
+
         Ok(result)
     }
 
@@ -259,6 +265,8 @@ impl WhisperLibrary {
     }
 }
 
+/// try to check and init whisper library if whisper recognition is enabled;
+/// this method should be called at app startup.
 pub async fn init_library() {
     let lock = WHISPER_LIB.clone();
     let _ = lock.lock().await;
@@ -293,6 +301,9 @@ pub async fn init_library() {
     }
 }
 
+/// load whisper with given model name, note that model name pattern is "ggml-\[name].bin",
+/// the param is the part "\[name]",
+/// for example: to load model "ggml-base.bin", pass param: "base"
 pub async fn load_model(model: String) -> Result<(), ProgramError> {
     log::debug!("Load whisper model: {}", model.clone());
     // lock download file by lib lock
@@ -348,6 +359,7 @@ pub async fn load_model(model: String) -> Result<(), ProgramError> {
     Ok(())
 }
 
+/// free whisper model
 pub async fn free_model() -> Result<(), ProgramError> {
     let (interrupted_tx, _) = &*MODEL_LOAD_STOP_SIG;
     match interrupted_tx.send(()) {
@@ -365,6 +377,7 @@ pub async fn free_model() -> Result<(), ProgramError> {
     lib.whisper_free()
 }
 
+/// update whisper model if choosing another model
 pub async fn update_model(model: String) -> Result<(), ProgramError> {
     free_model().await?;
 
@@ -381,7 +394,11 @@ pub async fn update_model(model: String) -> Result<(), ProgramError> {
     Ok(())
 }
 
-pub async fn recognize(config: &RecognizeByWhisper, data: &Vec<f32>) -> Result<String, ProgramError> {
+/// a united function to do transcribe of whisper,
+/// all transcribe params are set by default optimized values,
+/// all you need to offer is language and audio data.<br>
+/// note data must be Vec\<f32>, mono channel, sample rate: 16000
+pub async fn recognize(language: Option<String>, data: &Vec<f32>) -> Result<String, ProgramError> {
     if !MODEL_AVAILABLE.load(Ordering::Acquire) {
         return Err(ProgramError::from("Whisper model is not loaded"));
     }
@@ -390,11 +407,6 @@ pub async fn recognize(config: &RecognizeByWhisper, data: &Vec<f32>) -> Result<S
     let lib = lock.lock().await;
 
     let mut wparams = lib.whisper_full_default_params()?;
-    wparams.strategy = if wparams.beam_search.beam_size > 1 {
-        whisper_sampling_strategy_WHISPER_SAMPLING_BEAM_SEARCH
-    } else {
-        whisper_sampling_strategy_WHISPER_SAMPLING_GREEDY
-    };
     wparams.print_realtime = false;
     wparams.print_progress = false;
     wparams.print_timestamps = false;
@@ -403,8 +415,7 @@ pub async fn recognize(config: &RecognizeByWhisper, data: &Vec<f32>) -> Result<S
     wparams.single_segment = true;
     wparams.translate = false;
 
-    let lan: CString = if config.language.is_some() {
-        let language = config.language.clone().unwrap();
+    let lan: CString = if let Some(language) = language {
         CString::new(language)
             .map_err(|_| "unable to parse string to cstring")?
     } else {
@@ -414,10 +425,14 @@ pub async fn recognize(config: &RecognizeByWhisper, data: &Vec<f32>) -> Result<S
 
     wparams.language = lan.as_ptr();
 
-    wparams.n_threads = 8;
+    let n_threads = std::cmp::min(4, num_cpus::get());
+    wparams.n_threads = n_threads as std::os::raw::c_int;
+
     wparams.speed_up = false;
-    wparams.greedy.best_of = 5;
-    // TODO why choose 768?
+
+    // the original value is 1500(corresponds to 30s audio), and the value should be multiple of 64;
+    // setting it to 768 would make the Encoder evaluate about 2 times faster;
+    // refer: https://github.com/ggerganov/whisper.cpp/discussions/297
     wparams.audio_ctx = 768;
 
     let result = lib.whisper_full(data, wparams)?;
@@ -433,7 +448,7 @@ pub async fn recognize(config: &RecognizeByWhisper, data: &Vec<f32>) -> Result<S
     }
 
     // FIXME: remove later
-    if is_special_text(result.trim()) {
+    if is_special_text(&*result) {
         log::debug!("Whisper segment text is special text {}, skip", result.clone());
         return Ok(String::new());
     }
@@ -441,12 +456,27 @@ pub async fn recognize(config: &RecognizeByWhisper, data: &Vec<f32>) -> Result<S
     Ok(result)
 }
 
-/// if whisper return text like: \[Music] \[Whisper], it means it is not regular content
+/// if whisper return text like: \[Music] (Whisper), it means it is not regular content
 /// of somebody speaking, aka special text
 /// note: whisper lib set special_text=false should work,
 /// but for somehow it is still trying to send back text like this when you give it an empty audio
 fn is_special_text(text: &str) -> bool {
-    return text.starts_with("[") && text.ends_with("]");
+    let text_heard = String::from(text.trim());
+    {
+        let re = Regex::new(r"\(.*?\)").unwrap();
+        if re.is_match(&*text_heard) {
+            return true;
+        }
+    }
+
+    {
+        let re = Regex::new(r"\[.*?\]").unwrap();
+        if re.is_match(&*text_heard) {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// list all models in [MODEL_PATH] that is end with .bin(which is a file suffix of whisper model)

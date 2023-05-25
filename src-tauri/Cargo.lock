@@ -50,6 +50,7 @@ dependencies = [
  "log",
  "log4rs",
  "md5",
+ "num_cpus",
  "parking_lot 0.12.1",
  "rand 0.8.5",
  "reqwest",
