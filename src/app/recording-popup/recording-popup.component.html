@@ -1,5 +1,7 @@
-<div nz-row nzJustify="center" nzAlign="middle"
-     class="recorder">
-  <div nz-col><nz-spin nzSimple></nz-spin></div>
-  <div nz-col class="recorder-text">正在录音</div>
+<div class="recorder" #recorder>
+  <nz-timeline [nzPending]="pendingMessage" nzMode="left">
+    <ng-container *ngFor="let msg of messages">
+      <nz-timeline-item>{{msg}}</nz-timeline-item>
+    </ng-container>
+  </nz-timeline>
 </div>

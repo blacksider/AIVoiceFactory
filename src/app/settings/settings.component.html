@@ -1,6 +1,6 @@
 <form nz-form class="settings-form">
-  <nz-divider nzPlain [nzText]="audioTitle" nzOrientation="left">
-    <ng-template #audioTitle><b>声音设置</b></ng-template>
+  <nz-divider nzPlain [nzText]="title_audio" nzOrientation="left">
+    <ng-template #title_audio><b>声音设置</b></ng-template>
   </nz-divider>
   <div nz-row nzGutter="10">
     <div nz-col nzLg="6" nzSm="12">
@@ -30,6 +30,36 @@
                        [nzLabel]="getDeviceLabel(device)">
             </nz-option>
           </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+    </div>
+  </div>
+  <nz-divider nzPlain [nzText]="title_stream" nzOrientation="left">
+    <ng-template #title_stream><b>实时输出</b></ng-template>
+  </nz-divider>
+  <div nz-row nzGutter="10">
+    <div nz-col nzSpan="24">
+      <nz-form-item>
+        <nz-form-control>
+          <label nz-checkbox id="stream_input" name="stream_input"
+                 [(ngModel)]="audioConfig.stream.stream_input"
+                 (ngModelChange)="onChangeStreamConfig()">
+            <div>实时传输音频</div>
+            <div class="text-description">实时将生成的音频转发到音频输入中，需要配合VB-Audio Virtual Cable使用</div>
+            <div class="text-warning">请设置系统的音频输入设备为[CABLE Output(VB-Audio Virtual Cable)]</div>
+          </label>
+        </nz-form-control>
+      </nz-form-item>
+      <nz-form-item *ngIf="audioConfig.stream.stream_input">
+        <nz-form-control>
+          <label nz-checkbox id="stream_mic_input" name="stream_mic_input"
+                 [(ngModel)]="audioConfig.stream.stream_mic_input"
+                 (ngModelChange)="onChangeStreamConfig()">
+            <div>实时传输麦克风声音</div>
+            <div class="text-description">
+              关闭时，不会将麦克风声音同步到音频输入[CABLE Output(VB-Audio Virtual Cable)]中
+            </div>
+          </label>
         </nz-form-control>
       </nz-form-item>
     </div>

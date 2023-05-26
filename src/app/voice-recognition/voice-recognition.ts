@@ -1,5 +1,6 @@
 export class VoiceRecognitionConfig {
   enable!: boolean;
+  generate_after!: boolean;
   recordKey!: string;
   tool!: RecognitionTool;
 }

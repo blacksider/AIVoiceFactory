@@ -22,13 +22,6 @@
         <nz-footer>
           <div nz-row nzJustify="end" nzAlign="middle" nzGutter="10">
             <div nz-col>
-              <label nz-checkbox id="syncOnTextRecognize" name="syncOnTextRecognize"
-                     [(ngModel)]="syncOnTextRecognize"
-                     (ngModelChange)="onSyncValueChange()">
-                <span>同步语音识别</span>
-              </label>
-            </div>
-            <div nz-col>
               <button nz-button nzType="primary" (click)="generate()">生成语音</button>
             </div>
           </div>
@@ -42,11 +35,12 @@
                [nzExtra]="monitorExtra">
         <ng-template #monitorExtra>
           <button type="button" nz-button nzSize="small" (click)="collapseAudios(true)">折叠所有</button>
-          <button type="button" nz-button nzSize="small" class="space-left" (click)="collapseAudios(false)">展开所有</button>
+          <button type="button" nz-button nzSize="small" class="space-left" (click)="collapseAudios(false)">展开所有
+          </button>
         </ng-template>
         <nz-collapse>
           <nz-collapse-panel *ngFor="let item of audios"
-                             nzHeader="{{item.name}}  {{item.time | date: 'dd/MM/yy HH:mm'}}"
+                             nzHeader="{{item.time | date: 'yyyy-MM-dd HH:mm:ss'}}"
                              [nzExtra]="itemExtra"
                              [nzActive]="item.active"
                              (nzActiveChange)="onExpandItem($event, item)">

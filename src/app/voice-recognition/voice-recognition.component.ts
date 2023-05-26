@@ -59,6 +59,7 @@ export class VoiceRecognitionComponent implements OnInit, OnDestroy {
   private loadAndInitByConfig(configData: VoiceRecognitionConfig) {
     this.configForm = this.fb.group({
       enable: [configData.enable],
+      generate_after: [configData.generate_after],
       recordKey: [configData.recordKey],
     });
 

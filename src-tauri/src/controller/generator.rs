@@ -1,5 +1,4 @@
 use std::io::Cursor;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -9,7 +8,10 @@ use lazy_static::lazy_static;
 use rodio::{Decoder, OutputStream, Sink};
 use sled::{IVec, Transactional};
 use sled::transaction::ConflictableTransactionError;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
 
+use crate::common::{app, constants};
 use crate::config::config::DB_MANAGER;
 use crate::config::voice_engine;
 use crate::controller::{audio_manager, translator};
@@ -20,25 +22,42 @@ static AUDIO_DATA_TREE_INDEX: &str = "tree_index";
 static AUDIO_DATA_TREE_DATA: &str = "tree_data";
 
 lazy_static! {
-    static ref PLAY_MUTEX: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    static ref PLAY_MUTEX: AtomicBool = AtomicBool::new(false);
+    static ref GEN_AUDIO_MUTEX: AtomicBool = AtomicBool::new(false);
+    pub static ref PLAY_AUDIO_CHANNEL: Sender<String> = {
+        let (tx, mut rx) = mpsc::channel::<String>(10);
+        std::thread::spawn(|| {
+            tauri::async_runtime::block_on(async move {
+                while let Some(index) = rx.recv().await {
+                    log::debug!("Accept play audio event of index {}", index.clone());
+                    match play_audio(index.clone()).await {
+                        Ok(_) => {
+                        }
+                        Err(err) => {
+                            log::error!("Cannot play audio of index {} from event, err: {}",
+                                index.clone(), err)
+                        }
+                    }
+                }
+            });
+        });
+        tx
+    };
 }
 
 const MAX_DATA_SIZE: usize = 30;
 
-
 pub fn start_check_audio_caches() {
     log::info!("Start checking audio caches thread");
-    std::thread::spawn(move || {
-        loop {
-            match check_audio_caches() {
-                Ok(_) => {}
-                Err(err) => {
-                    log::error!("Unable to check audio caches, err: {}", err)
-                }
+    loop {
+        match check_audio_caches() {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Unable to check audio caches, err: {}", err)
             }
-            std::thread::sleep(Duration::from_secs(60));
         }
-    });
+        std::thread::sleep(Duration::from_secs(60));
+    }
 }
 
 /// only save recent MAX_DATA_SIZE caches
@@ -74,9 +93,7 @@ pub fn check_audio_caches() -> Result<(), ProgramError> {
 }
 
 fn new_index_name() -> String {
-    let time: DateTime<Utc> = Utc::now();
-    let formatted_time = time.format("%Y%m%d%H%M%S").to_string();
-    formatted_time
+    uuid::Uuid::new_v4().to_string()
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -200,16 +217,28 @@ fn save_audio(source: String, translated: String, audio: Bytes) -> Result<AudioC
 
 /// generate audio content and it's temporary wav content, and return current cache name
 pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
+    let generating = GEN_AUDIO_MUTEX.load(Ordering::Acquire);
+    if generating {
+        log::info!("Generate audio is busy");
+        return None;
+    }
+
+    GEN_AUDIO_MUTEX.store(true, Ordering::Release);
+
     let translated = translator::translate(text.clone()).await;
     let translated_text: String = translated.or_else(|| Some(text.clone())).unwrap();
-    let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().await;
-    let config = manager.get_config();
+
+    let config = {
+        let manager = voice_engine::VOICE_ENGINE_CONFIG_MANAGER.lock().await;
+        manager.get_config()
+    };
 
     if config.is_voice_vox_config() {
+        // unwrap here since if is true, this must be ok
         let voice_vox_config = config.get_voice_vox_config().unwrap();
-        log::debug!("Generating audio by text: {}", translated_text.clone());
+        log::info!("Generating audio by voicevox with text: {}", translated_text.clone());
         let audio_data = voicevox::gen_audio(&voice_vox_config, translated_text.clone()).await;
-        log::debug!("Generate audio cache success");
+        log::debug!("Generate audio by voicevox success");
         match audio_data {
             Ok(audio) => {
                 let save = save_audio(
@@ -219,6 +248,10 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
                 match save {
                     Ok(index) => {
                         log::debug!("Generate audio cache with index: {}", index.name.clone());
+                        // send event
+                        app::silent_emit_all(constants::event::ON_AUDIO_GENERATED, index.clone());
+                        log::debug!("Generated index: {:?}", index.clone());
+                        GEN_AUDIO_MUTEX.store(false, Ordering::Release);
                         return Some(index);
                     }
                     Err(err) => {
@@ -231,37 +264,55 @@ pub async fn generate_audio(text: String) -> Option<AudioCacheIndex> {
             }
         }
     }
+    GEN_AUDIO_MUTEX.store(false, Ordering::Release);
     None
 }
 
-pub fn play_audio(index: String) -> Result<bool, ProgramError> {
-    let data_tree = DB_MANAGER.clone().db.open_tree(AUDIO_DATA_TREE_DATA)?;
-    let cache = data_tree.get(index.into_bytes())?;
-    if let Some(encoded) = cache {
-        let mutex = PLAY_MUTEX.clone();
-        let playing = mutex.load(Ordering::Relaxed);
-        if !playing {
-            mutex.store(true, Ordering::Relaxed);
-            tauri::async_runtime::spawn(async move {
-                match play_encoded_audio(&encoded) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        log::error!("Unable to play encoded audio, err: {}", err)
-                    }
-                }
-                mutex.store(false, Ordering::Relaxed);
-            });
+pub fn play_audio_silently(index: String) {
+    tauri::async_runtime::spawn(async move {
+        match play_audio(index.clone()).await {
+            Ok(_) => {
+                log::debug!("Play audio {} silently success", index);
+            }
+            Err(err) => {
+                log::error!("Cannot play audio {}, err: {}", index, err)
+            }
         }
+    });
+}
+
+pub async fn play_audio(index: String) -> Result<bool, ProgramError> {
+    log::debug!("Play audio of index {}", index.clone());
+
+    let playing = PLAY_MUTEX.load(Ordering::Acquire);
+    if playing {
+        log::debug!("Play audio is busy");
+        return Ok(false);
+    }
+
+    let data_tree = DB_MANAGER.clone().db.open_tree(AUDIO_DATA_TREE_DATA)?;
+    let cache = data_tree.get(index.clone().into_bytes())?;
+
+    if let Some(encoded) = cache {
+        PLAY_MUTEX.store(true, Ordering::Release);
+        log::debug!("Playing audio of index {}", index.clone());
+        match play_encoded_audio(&encoded).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Unable to play encoded audio, err: {}", err);
+            }
+        }
+        PLAY_MUTEX.store(false, Ordering::Release);
         Ok(true)
     } else {
         Ok(false)
     }
 }
 
-fn play_wav_audio(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
+async fn play_wav_audio(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
     let cursor = Cursor::new(wav_bytes);
     let source = Decoder::new(cursor)?;
-    let output_device = audio_manager::get_output_device()?;
+    let output_device = audio_manager::get_output_device().await?;
     let (_stream, stream_handle) = OutputStream::try_from_device(&output_device)?;
     let sink = Sink::try_new(&stream_handle)?;
     sink.append(source);
@@ -270,9 +321,33 @@ fn play_wav_audio(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
     Ok(())
 }
 
-fn play_encoded_audio(encoded: &IVec) -> Result<(), ProgramError> {
+fn play_to_vb_audio_cable(wav_bytes: Vec<u8>) -> Result<(), ProgramError> {
+    let cursor = Cursor::new(wav_bytes);
+    let source = Decoder::new(cursor)?;
+    let output_device = audio_manager::get_vb_audio_cable_output()?;
+    let (_stream, stream_handle) = OutputStream::try_from_device(&output_device)?;
+    let sink = Sink::try_new(&stream_handle)?;
+    sink.append(source);
+    sink.play();
+    sink.sleep_until_end();
+    Ok(())
+}
+
+async fn play_encoded_audio(encoded: &IVec) -> Result<(), ProgramError> {
     let decoded: AudioCache = bincode::deserialize(&encoded)?;
     let wav_bytes = decoded.audio;
-    play_wav_audio(wav_bytes)
+    if audio_manager::is_stream_input_enabled().await {
+        let wav_bytes = wav_bytes.clone();
+        std::thread::spawn(|| {
+            match play_to_vb_audio_cable(wav_bytes) {
+                Ok(_) => {}
+                Err(err) => {
+                    log::error!("Failed to play by VB audio cable, err: {}", err);
+                }
+            }
+        });
+    }
+    play_wav_audio(wav_bytes).await?;
+    Ok(())
 }
 

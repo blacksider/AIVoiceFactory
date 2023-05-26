@@ -31,15 +31,35 @@
       <nz-form-item>
         <nz-form-label [nzSpan]="24" nzFor="appId">APP ID</nz-form-label>
         <nz-form-control nzMd="12" nzXs="24">
-          <input id="appId" name="appId" nz-input
-                 formControlName="appId"/>
+          <nz-input-group [nzSuffix]="appIdTpl">
+            <input id="appId" name="appId"
+                   [type]="appIdVisible ? 'text' : 'password'"
+                   nz-input
+                   formControlName="appId"/>
+          </nz-input-group>
+          <ng-template #appIdTpl>
+            <span
+              nz-icon
+              [nzType]="appIdVisible ? 'eye-invisible' : 'eye'"
+              (click)="appIdVisible = !appIdVisible"></span>
+          </ng-template>
         </nz-form-control>
       </nz-form-item>
       <nz-form-item>
         <nz-form-label [nzSpan]="24" nzFor="secret">密钥</nz-form-label>
         <nz-form-control nzMd="12" nzXs="24">
-          <input type="password" id="secret" name="secret" nz-input
-                 formControlName="secret"/>
+          <nz-input-group [nzSuffix]="secretTpl">
+            <input id="secret" name="secret"
+                   [type]="secretVisible ? 'text' : 'password'"
+                   nz-input
+                   formControlName="secret"/>
+          </nz-input-group>
+          <ng-template #secretTpl>
+            <span
+              nz-icon
+              [nzType]="secretVisible ? 'eye-invisible' : 'eye'"
+              (click)="secretVisible = !secretVisible"></span>
+          </ng-template>
         </nz-form-control>
       </nz-form-item>
       <nz-form-item>

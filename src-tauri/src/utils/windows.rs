@@ -16,11 +16,10 @@ use winapi::um::winnt::{HANDLE, PROCESS_QUERY_INFORMATION, PROCESS_TERMINATE};
 
 #[cfg(target_os = "windows")]
 pub fn process_exists(name: &str, path: &str) -> (bool, DWORD) {
-    let mut processes: [DWORD; 1024] = [0; 1024];
-    let mut bytes_returned: DWORD = 0;
-    let mut process_count: DWORD = 0;
-
     unsafe {
+        let mut processes: [DWORD; 1024] = [0; 1024];
+        let mut bytes_returned: DWORD = 0;
+
         // Enumerate all running processes
         if EnumProcesses(
             processes.as_mut_ptr(),
@@ -32,7 +31,7 @@ pub fn process_exists(name: &str, path: &str) -> (bool, DWORD) {
         }
 
         // Calculate the number of processes returned
-        process_count = bytes_returned / size_of::<DWORD>() as DWORD;
+        let process_count = bytes_returned / size_of::<DWORD>() as DWORD;
 
         // Loop through the list of process IDs and check each one
         for i in 0..process_count {

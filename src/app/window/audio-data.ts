@@ -11,21 +11,18 @@ export class AudioCacheDetail {
 
 export class AudioRegEvent {
   text!: string;
-  generated!: boolean;
 
   constructor() {
     this.text = '';
-    this.generated = true;
   }
 
   static empty(): AudioRegEvent {
     return new AudioRegEvent();
   }
 
-  static new(text: string, generated?: boolean): AudioRegEvent {
+  static new(text: string): AudioRegEvent {
     let event = new AudioRegEvent();
     event.text = text;
-    event.generated = !!generated;
     return event;
   }
 }

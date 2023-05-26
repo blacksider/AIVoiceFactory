@@ -21,6 +21,9 @@ export class AutoTranslationComponent implements OnInit {
 
   configForm!: FormGroup;
 
+  appIdVisible = false;
+  secretVisible = false;
+
   constructor(private activatedRoute: ActivatedRoute,
               private service: AutoTranslationService,
               private fb: FormBuilder) {

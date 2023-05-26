@@ -1,11 +1,17 @@
 .recorder {
-  background-color: #1f1d1d;
-  color: #1fa679;
+  background-color: rgba(31, 29, 29, 0.6);
+  color: #fff;
   border-radius: 4px;
   padding: 8px 10px;
-  overflow: hidden;
+  overflow-y: auto;
+  height: auto;
+  max-height: 100%;
 }
 
 .recorder-text {
   padding-left: 10px;
+}
+
+:host ::ng-deep .ant-timeline-item-content {
+  color: #fff;
 }

@@ -19,6 +19,7 @@ mod commands;
 mod controller;
 mod utils;
 mod common;
+mod audio;
 
 fn create_system_tray() -> SystemTray {
     let quit = CustomMenuItem::new("exit".to_string(), "Exit");
@@ -98,10 +99,11 @@ pub fn setup(app: &mut App<Wry>) -> Result<(), ProgramError> {
     }
 
     audio_recorder::start_shortcut(app.app_handle())?;
-
     tauri::async_runtime::spawn(async {
-        audio_manager::watch_audio_devices();
+        audio_manager::watch_audio_devices().await;
     });
+    // lazy init play audio channel
+    generator::PLAY_AUDIO_CHANNEL.is_closed();
     tauri::async_runtime::spawn(async {
         generator::start_check_audio_caches();
     });
@@ -109,7 +111,6 @@ pub fn setup(app: &mut App<Wry>) -> Result<(), ProgramError> {
         voice_engine::check_voicevox().await;
         whisper::check_whisper_lib().await;
     });
-
 
     Ok(())
 }
@@ -122,7 +123,7 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             log::info!("Application started");
-            common::app::set_app_handle(app.app_handle());
+            app::set_app_handle(app.app_handle());
             setup(app)?;
             Ok(())
         })
@@ -134,6 +135,9 @@ fn main() {
             commands::configs::get_voice_recognition_config,
             commands::configs::save_voice_recognition_config,
             commands::configs::get_audio_config,
+            commands::configs::change_output_device,
+            commands::configs::change_input_device,
+            commands::configs::change_stream_config,
 
             commands::voicevox::is_voicevox_engine_initialized,
             commands::voicevox::is_loading_voicevox_engine,
@@ -148,8 +152,6 @@ fn main() {
             commands::audios::delete_audio,
             commands::audios::play_audio,
             commands::audios::generate_audio,
-            commands::audios::change_output_device,
-            commands::audios::change_input_device,
             commands::audios::is_recorder_recording,
 
             commands::whisper::whisper_available_models,
