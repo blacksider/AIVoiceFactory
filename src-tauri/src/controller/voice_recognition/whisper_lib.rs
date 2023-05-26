@@ -447,7 +447,6 @@ pub async fn recognize(language: Option<String>, data: &Vec<f32>) -> Result<Stri
         result.push_str(&*text);
     }
 
-    // FIXME: remove later
     if is_special_text(&*result) {
         log::debug!("Whisper segment text is special text {}, skip", result.clone());
         return Ok(String::new());

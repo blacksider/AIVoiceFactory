@@ -10,6 +10,7 @@ use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::audio::listener;
 use crate::common::{app, constants};
+use crate::config::voice_recognition;
 use crate::controller::{audio_manager, generator};
 use crate::controller::errors::ProgramError;
 use crate::controller::recognizer;
@@ -89,14 +90,14 @@ async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
                         app::silent_emit_all(constants::event::ON_RECORDING_STATE,
                                              TalkRecordingState::DetectSpeech);
 
-                        log::debug!("Speech detected, Processing ...");
+                        log::debug!("Speech detected, ready to recognize");
 
                         audio.get(voice_ms, &mut pcmf32_cur);
 
                         let mut text_heard = String::new();
                         if !force_speak {
                             let reg_res = recognizer::recognize(
-                                &pcmf32_cur,channels, sample_rate).await;
+                                &pcmf32_cur, channels, sample_rate).await;
                             match reg_res {
                                 Ok(text) => {
                                     text_heard = String::from(text.trim());
@@ -108,8 +109,6 @@ async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
                                 }
                             }
                         }
-
-                        log::debug!("Heard original: {}", text_heard.clone());
 
                         // remove text between brackets []
                         {
@@ -142,7 +141,7 @@ async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
 
                         force_speak = false;
 
-                        log::info!("Heard: {}", text_heard.clone());
+                        log::info!("Recognized: {}", text_heard.clone());
 
                         // emit  events
                         app::silent_emit_all(constants::event::ON_AUDIO_RECOGNIZE_TEXT,
@@ -150,18 +149,25 @@ async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
                         app::silent_emit_all(constants::event::ON_RECORDING_RECOGNIZE_TEXT,
                                              text_heard.clone());
 
-                        // generate audio by text
-                        let index = generator::generate_audio(text_heard).await;
-                        if let Some(cache) = index {
-                            // play generated audio
-                            match generator::PLAY_AUDIO_CHANNEL.send(cache.name.clone()).await {
-                                Ok(_) => {
-                                    log::debug!("Send generated audio to play channel success");
+                        let gen_audio = {
+                            let manager =
+                                voice_recognition::VOICE_REC_CONFIG_MANAGER.read().await;
+                            manager.get_config().generate_after
+                        };
+                        if gen_audio {
+                            // generate audio by text
+                            let index = generator::generate_audio(text_heard).await;
+                            if let Some(cache) = index {
+                                // play generated audio
+                                match generator::PLAY_AUDIO_CHANNEL.send(cache.name.clone()).await {
+                                    Ok(_) => {
+                                        log::debug!("Send generated audio to play channel success");
+                                    }
+                                    Err(err) => {
+                                        log::error!("Failed to send generated audio to play channel, err: {}", err);
+                                    }
                                 }
-                                Err(err) => {
-                                    log::error!("Failed to send generated audio to play channel, err: {}", err);
-                                }
-                            };
+                            }
                         }
 
                         audio.clear();

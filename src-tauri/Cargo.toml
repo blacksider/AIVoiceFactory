@@ -1,6 +1,6 @@
 [package]
 name = "ai_voice_factory"
-version = "1.0.0"
+version = "1.0.1"
 description = "AI voice factory for various kind of voice functionalities"
 authors = ["github.com/blacksider"]
 license = ""
