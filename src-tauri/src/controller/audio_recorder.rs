@@ -85,10 +85,15 @@ async fn recorder_handler(app: AppHandle<Wry>) {
     };
 }
 
-pub fn start_shortcut(app: AppHandle<Wry>) -> Result<(), ProgramError> {
-    let config = voice_recognition::load_voice_recognition_config()?;
+pub async fn start_shortcut() -> Result<(), ProgramError> {
+    let config = {
+        let manager =
+            voice_recognition::VOICE_REC_CONFIG_MANAGER.read().await;
+        manager.get_config()
+    };
     if config.enable {
         if !config.record_key.is_empty() {
+            let app = app::get_app_handle()?;
             let key = config.record_key;
             let mut manager = app.global_shortcut_manager();
             if manager.is_registered(&*key)? {

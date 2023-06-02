@@ -270,35 +270,34 @@ impl WhisperLibrary {
 pub async fn init_library() {
     let lock = WHISPER_LIB.clone();
     let _ = lock.lock().await;
-    match voice_recognition::load_voice_recognition_config() {
-        Ok(config) => {
-            if !config.enable {
-                return;
-            }
-            let (rec, by_whisper) = config.recognize_by_whisper();
-            if !(rec && by_whisper.is_some()) {
-                return;
-            }
-            let config = by_whisper.unwrap();
-            if config.config_type != WhisperConfigType::Binary {
-                return;
-            }
 
-            // spawn a new thread to load model
-            let model = config.use_model.clone();
-            tauri::async_runtime::spawn(async move {
-                match load_model(model.clone()).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        log::error!("Load model {} failed with error: {}", model, err);
-                    }
-                }
-            });
-        }
-        Err(err) => {
-            log::error!("Cannot get current voice recognition config, err: {}", err);
-        }
+    let config = {
+        let manager =
+            voice_recognition::VOICE_REC_CONFIG_MANAGER.read().await;
+        manager.get_config()
+    };
+    if !config.enable {
+        return;
     }
+    let (rec, by_whisper) = config.recognize_by_whisper();
+    if !(rec && by_whisper.is_some()) {
+        return;
+    }
+    let config = by_whisper.unwrap();
+    if config.config_type != WhisperConfigType::Binary {
+        return;
+    }
+
+    // spawn a new thread to load model
+    let model = config.use_model.clone();
+    tauri::async_runtime::spawn(async move {
+        match load_model(model.clone()).await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Load model {} failed with error: {}", model, err);
+            }
+        }
+    });
 }
 
 /// load whisper with given model name, note that model name pattern is "ggml-\[name].bin",

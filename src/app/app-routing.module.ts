@@ -7,7 +7,7 @@ import {AutoTranslationComponent} from './auto-translation/auto-translation.comp
 import {SettingsComponent} from './settings/settings.component';
 import {voiceEngineConfigResolver} from './voice-engine/voice-engine.service';
 import {autoTranslationConfigResolver} from './auto-translation/auto-translation.service';
-import {audioConfigResolver} from './settings/settings.service';
+import {audioConfigResolver, httpProxyConfigResolver} from './settings/settings.service';
 import {VoiceRecognitionComponent} from "./voice-recognition/voice-recognition.component";
 import {voiceRecognitionConfigResolver} from "./voice-recognition/voice-recognition.service";
 import {RecordingPopupComponent} from "./recording-popup/recording-popup.component";
@@ -43,7 +43,8 @@ const routes: Routes = [
         path: 'settings',
         component: SettingsComponent,
         resolve: {
-          audioConfig: audioConfigResolver
+          audioConfig: audioConfigResolver,
+          httpProxyConfig: httpProxyConfigResolver,
         }
       }
     ]

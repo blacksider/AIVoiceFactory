@@ -12,7 +12,7 @@ async fn concat_api(config: &VoiceVoxEngineConfig, suffix: &str) -> String {
 }
 
 pub async fn audio_query(config: &VoiceVoxEngineConfig, text: String) -> Result<serde_json::Value, ProgramError> {
-    let client = reqwest::Client::new();
+    let client = http::new_http_client().await?;
     let res: reqwest::Response = client
         .post(concat_api(config, "audio_query").await)
         .query(&[("speaker", config.get_speaker().to_string()), ("text", text)])
@@ -32,7 +32,7 @@ pub async fn synthesis(config: &VoiceVoxEngineConfig, audio_data: serde_json::Va
     headers.insert("Content-Type", "application/json".parse().unwrap());
     headers.insert("Accept", "audio/wav".parse().unwrap());
 
-    let client = reqwest::Client::new();
+    let client = http::new_http_client().await?;
     let res = client
         .post(concat_api(config, "synthesis").await)
         .query(&[("speaker", config.get_speaker())])

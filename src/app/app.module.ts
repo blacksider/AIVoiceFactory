@@ -52,6 +52,7 @@ import {KeyRecorderComponent} from './key-recorder/key-recorder.component';
 import {RecordingPopupComponent} from './recording-popup/recording-popup.component';
 import {NzModalModule} from 'ng-zorro-antd/modal';
 import {NzAlertModule} from "ng-zorro-antd/alert";
+import {NzInputNumberModule} from "ng-zorro-antd/input-number";
 
 const icons: IconDefinition[] = [
   PlayCircleOutline,
@@ -106,7 +107,8 @@ registerLocaleData(zh);
     NzImageModule,
     NzModalModule,
     NzAlertModule,
-    NzTimelineModule
+    NzTimelineModule,
+    NzInputNumberModule
   ],
   providers: [
     {provide: NZ_I18N, useValue: zh_CN},

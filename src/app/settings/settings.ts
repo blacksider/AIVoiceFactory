@@ -39,3 +39,16 @@ export class AudioConfigResponseData {
   default_input_device!: string;
   input_devices!: string[];
 }
+
+export class HttpProxyAuthentication {
+  username!: string;
+  password!: string;
+}
+
+export class HttpProxyConfig {
+  enable!: boolean;
+  hostname?: string;
+  port?: number;
+  enableAuth!: boolean;
+  authentication?: HttpProxyAuthentication;
+}

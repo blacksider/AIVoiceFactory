@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use cpal::{BufferSize, Device, SizedSample, Stream, StreamConfig, SupportedStreamConfig};
+use cpal::{Device, Stream};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use lazy_static::lazy_static;
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::controller::errors::{CommonError, ProgramError};
+use crate::controller::errors::ProgramError;
+use crate::utils;
 
 lazy_static! {
     static ref STREAM_AUDIO: Arc<Mutex<StreamAudio>> = Arc::new(Mutex::new(StreamAudio::new()));
@@ -90,37 +91,6 @@ impl Listener {
         }
     }
 
-    fn build_input_stream<T>(
-        &mut self,
-        device: Device,
-        config: &SupportedStreamConfig,
-    ) -> Result<Stream, ProgramError>
-        where
-            T: SizedSample + dasp_sample::conv::ToSample<f32> {
-        let err_fn = |err|
-            log::error!("an error occurred on the stream: {}", err);
-        let stream_config = StreamConfig {
-            channels: config.channels(),
-            sample_rate: config.sample_rate(),
-            buffer_size: BufferSize::Default,
-        };
-
-        let stream = device.build_input_stream(
-            &stream_config,
-            |data: &[T], _: &_| {
-                if RUNNING.load(Ordering::SeqCst) {
-                    let buffer: Vec<f32> = data.iter().map(|s| T::to_sample(*s)).collect();
-                    let lock = STREAM_AUDIO.clone();
-                    let mut stream_audio = lock.lock().unwrap();
-                    stream_audio.on_data(buffer);
-                }
-            },
-            err_fn,
-            None,
-        )?;
-        Ok(stream)
-    }
-
     pub fn init(&mut self, device: Device) -> Result<(), ProgramError> {
         let config = device.default_input_config()?;
         let sample_rate = config.sample_rate().0;
@@ -136,23 +106,14 @@ impl Listener {
         }
 
         RUNNING.store(false, Ordering::Release);
-
-        let stream = match config.sample_format() {
-            cpal::SampleFormat::I8 => self.build_input_stream::<i8>(device, &config)?,
-            cpal::SampleFormat::I16 => self.build_input_stream::<i16>(device, &config)?,
-            cpal::SampleFormat::I32 => self.build_input_stream::<i32>(device, &config)?,
-            cpal::SampleFormat::I64 => self.build_input_stream::<i64>(device, &config)?,
-            cpal::SampleFormat::U8 => self.build_input_stream::<u8>(device, &config)?,
-            cpal::SampleFormat::U16 => self.build_input_stream::<u16>(device, &config)?,
-            cpal::SampleFormat::U32 => self.build_input_stream::<u32>(device, &config)?,
-            cpal::SampleFormat::U64 => self.build_input_stream::<u64>(device, &config)?,
-            cpal::SampleFormat::F32 => self.build_input_stream::<f32>(device, &config)?,
-            cpal::SampleFormat::F64 => self.build_input_stream::<f64>(device, &config)?,
-            sample_format => {
-                return Err(ProgramError::wrap(
-                    CommonError::new(format!("Unsupported sample format '{}'", sample_format))));
-            }
-        };
+        let stream = utils::audio::build_input_stream(
+            &device, &config, |data: Vec<f32>| {
+                if RUNNING.load(Ordering::SeqCst) {
+                    let lock = STREAM_AUDIO.clone();
+                    let mut stream_audio = lock.lock().unwrap();
+                    stream_audio.on_data(data);
+                }
+            })?;
         self.stream = Some(stream);
         Ok(())
     }

@@ -98,7 +98,14 @@ pub fn setup(app: &mut App<Wry>) -> Result<(), ProgramError> {
         window.set_position(tauri::PhysicalPosition { x: window_x, y: window_y })?;
     }
 
-    audio_recorder::start_shortcut(app.app_handle())?;
+    tauri::async_runtime::spawn(async {
+        match audio_recorder::start_shortcut().await {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to start shortcut, err: {}", err);
+            }
+        }
+    });
     tauri::async_runtime::spawn(async {
         audio_manager::watch_audio_devices().await;
     });
@@ -138,6 +145,8 @@ fn main() {
             commands::configs::change_output_device,
             commands::configs::change_input_device,
             commands::configs::change_stream_config,
+            commands::configs::get_http_proxy_config,
+            commands::configs::save_http_proxy_config,
 
             commands::voicevox::is_voicevox_engine_initialized,
             commands::voicevox::is_loading_voicevox_engine,

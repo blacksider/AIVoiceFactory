@@ -18,6 +18,7 @@ use crate::common::{app, constants};
 use crate::config::voice_engine::VoiceVoxEngineConfig;
 use crate::controller::errors::ProgramError;
 use crate::utils;
+use crate::utils::http;
 
 const DEVICE_CPU: &str = "cpu";
 const DEVICE_CUDA: &str = "cuda";
@@ -247,7 +248,7 @@ impl EngineProcess {
                 log::debug!("Downloading engin file");
                 let mut tmp_file = File::create(download_tmp_file.clone())?;
                 // download 7z file
-                let client = reqwest::Client::new();
+                let client = http::new_http_client().await?;
                 let mut response: reqwest::Response = client
                     .get(download_url)
                     .send()

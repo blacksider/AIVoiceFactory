@@ -7,13 +7,13 @@ use crate::controller::errors::{CommonError, ProgramError};
 use crate::controller::voice_recognition::whisper_lib;
 pub use crate::controller::voice_recognition::whisper_lib::available_models;
 pub use crate::controller::voice_recognition::whisper_lib::init_library as check_whisper_lib;
-use crate::utils::audio;
+use crate::utils::{audio, http};
 
 const REQ_TASK: &str = "transcribe";
 const REQ_OUTPUT: &str = "txt";
 
 async fn asr_by_http(config: &RecognizeByWhisper, samples: &Vec<f32>) -> Result<String, ProgramError> {
-    let client = reqwest::Client::new();
+    let client = http::new_http_client().await?;
 
     let mut headers = HeaderMap::new();
 

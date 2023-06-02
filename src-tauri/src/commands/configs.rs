@@ -1,10 +1,12 @@
 use crate::common::{app, constants};
-use crate::config::{auto_translation, voice_engine, voice_recognition};
+use crate::config::{auto_translation, proxy, voice_engine, voice_recognition};
+use crate::config::audio::{AudioSelection, AudioStreamConfig};
 use crate::config::auto_translation::AutoTranslationConfig;
+use crate::config::proxy::HttpProxyConfig;
 use crate::config::voice_engine::VoiceEngineConfig;
 use crate::config::voice_recognition::VoiceRecognitionConfig;
 use crate::controller::{audio_manager, audio_recorder};
-use crate::controller::audio_manager::{AudioConfigResponseData, AudioSelection, StreamConfig};
+use crate::controller::audio_manager::AudioConfigResponseData;
 use crate::controller::voice_recognition::whisper;
 
 #[tauri::command]
@@ -45,14 +47,11 @@ pub async fn get_voice_recognition_config() -> Option<VoiceRecognitionConfig> {
 #[tauri::command]
 pub async fn save_voice_recognition_config(config: VoiceRecognitionConfig) -> bool {
     // try to get original config to extract record_key
-    let old_config =
-        voice_recognition::load_voice_recognition_config();
-    if old_config.is_err() {
-        log::error!("Unable to load current voice recognition config, err: {}",
-                old_config.unwrap_err());
-        return false;
-    }
-    let old_config = old_config.unwrap();
+    let old_config = {
+        let manager =
+            voice_recognition::VOICE_REC_CONFIG_MANAGER.read().await;
+        manager.get_config()
+    };
 
     let mut manager = voice_recognition::VOICE_REC_CONFIG_MANAGER
         .write()
@@ -129,7 +128,7 @@ pub async fn change_input_device(selection: AudioSelection) -> Option<AudioConfi
 }
 
 #[tauri::command]
-pub async fn change_stream_config(stream: StreamConfig) -> Option<AudioConfigResponseData> {
+pub async fn change_stream_config(stream: AudioStreamConfig) -> Option<AudioConfigResponseData> {
     match audio_manager::change_stream_config(stream).await {
         Ok(data) => {
             return Some(data);
@@ -139,4 +138,18 @@ pub async fn change_stream_config(stream: StreamConfig) -> Option<AudioConfigRes
         }
     }
     None
+}
+
+#[tauri::command]
+pub async fn get_http_proxy_config() -> Option<HttpProxyConfig> {
+    let manager = proxy::HTTP_PROXY_CONFIG_MANAGER
+        .read().await;
+    Some(manager.get_config())
+}
+
+#[tauri::command]
+pub async fn save_http_proxy_config(config: HttpProxyConfig) -> Option<bool> {
+    let mut manager = proxy::HTTP_PROXY_CONFIG_MANAGER
+        .write().await;
+    Some(manager.save_config(config))
 }

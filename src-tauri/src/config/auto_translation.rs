@@ -4,11 +4,12 @@ use tokio::sync::Mutex;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::config::config;
-use crate::controller::errors::ProgramError;
+use crate::gen_simple_config_manager;
 
 static TRANSLATION_CONFIG: &str = "auto_translation";
 static SALT: &str = "1435660288";
+
+gen_simple_config_manager!(AutoTranslationConfigManager, AutoTranslationConfig, TRANSLATION_CONFIG, gen_default_config);
 
 lazy_static! {
    pub static ref AUTO_TRANS_CONFIG_MANAGER: Mutex<AutoTranslationConfigManager> = Mutex::new(AutoTranslationConfigManager::init());
@@ -68,13 +69,13 @@ impl AutoTranslationConfig {
             AutoTranslateTool::Baidu(config) => {
                 (true, Some(config))
             }
-        }
+        };
     }
 }
 
-fn gen_default_config() -> Result<AutoTranslationConfig, ProgramError> {
+fn gen_default_config() -> AutoTranslationConfig {
     let empty_str = "".to_string();
-    let default_config = AutoTranslationConfig {
+    AutoTranslationConfig {
         enable: false,
         tool: AutoTranslateTool::Baidu(TranslateByBaidu {
             api_addr: empty_str.clone(),
@@ -83,62 +84,6 @@ fn gen_default_config() -> Result<AutoTranslationConfig, ProgramError> {
             from: "auto".to_string(),
             to: "jp".to_string(),
         }),
-    };
-    config::save_config(TRANSLATION_CONFIG, &default_config)?;
-    Ok(default_config)
-}
-
-pub fn load_auto_translation_config() -> Result<AutoTranslationConfig, ProgramError> {
-    let default_config = config::get_config_raw::<AutoTranslationConfig>(TRANSLATION_CONFIG)?;
-    if default_config.is_none() {
-        let default_config = gen_default_config()?;
-        return Ok(default_config);
-    }
-    config::load_config::<AutoTranslationConfig>(TRANSLATION_CONFIG)
-}
-
-pub fn save_auto_translation_config(config: &AutoTranslationConfig) -> Result<(), ProgramError> {
-    let default_config = config::get_config_raw::<AutoTranslationConfig>(TRANSLATION_CONFIG)?;
-    if default_config.is_none() {
-        gen_default_config()?;
-        return Ok(());
-    }
-    config::save_config(TRANSLATION_CONFIG, config)
-}
-
-#[derive(Debug)]
-pub struct AutoTranslationConfigManager {
-    config: AutoTranslationConfig,
-}
-
-impl AutoTranslationConfigManager {
-    pub fn init() -> Self {
-        let config = load_auto_translation_config();
-        match config {
-            Ok(data) => AutoTranslationConfigManager { config: data },
-            Err(err) => {
-                log::error!("Failed to init auto translation config manager, load config with error: {}", err);
-                panic!("Unable to init auto translation config manager");
-            }
-        }
-    }
-
-    pub fn get_config(&self) -> AutoTranslationConfig {
-        self.config.clone()
-    }
-
-    pub fn save_config(&mut self, config: AutoTranslationConfig) -> bool {
-        let result = save_auto_translation_config(&config);
-        match result {
-            Ok(_) => {
-                self.config = config;
-                true
-            }
-            Err(err) => {
-                log::error!("Failed to save auto translation config, err: {}", err);
-                false
-            }
-        }
     }
 }
 

@@ -1,11 +1,11 @@
+use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 
-use lazy_static::lazy_static;
-
-use crate::config::config;
-use crate::controller::errors::ProgramError;
+use crate::gen_simple_config_manager;
 
 static RECOGNITION_CONFIG: &str = "voice_recognition";
+
+gen_simple_config_manager!(VoiceRecognitionConfigManager, VoiceRecognitionConfig, RECOGNITION_CONFIG, gen_default_config);
 
 lazy_static! {
     pub static ref VOICE_REC_CONFIG_MANAGER: RwLock<VoiceRecognitionConfigManager> = RwLock::new(VoiceRecognitionConfigManager::init());
@@ -56,9 +56,9 @@ impl VoiceRecognitionConfig {
     }
 }
 
-fn gen_default_config() -> Result<VoiceRecognitionConfig, ProgramError> {
+fn gen_default_config() -> VoiceRecognitionConfig {
     let empty_str = "".to_string();
-    let default_config = VoiceRecognitionConfig {
+    VoiceRecognitionConfig {
         enable: false,
         generate_after: false,
         record_key: "F1".to_string(),
@@ -68,61 +68,5 @@ fn gen_default_config() -> Result<VoiceRecognitionConfig, ProgramError> {
             api_addr: empty_str.clone(),
             language: None,
         }),
-    };
-    config::save_config(RECOGNITION_CONFIG, &default_config)?;
-    Ok(default_config)
-}
-
-pub fn load_voice_recognition_config() -> Result<VoiceRecognitionConfig, ProgramError> {
-    let default_config = config::get_config_raw::<VoiceRecognitionConfig>(RECOGNITION_CONFIG)?;
-    if default_config.is_none() {
-        let default_config = gen_default_config()?;
-        return Ok(default_config);
-    }
-    config::load_config::<VoiceRecognitionConfig>(RECOGNITION_CONFIG)
-}
-
-pub fn save_voice_recognition_config(config: &VoiceRecognitionConfig) -> Result<(), ProgramError> {
-    let default_config = config::get_config_raw::<VoiceRecognitionConfig>(RECOGNITION_CONFIG)?;
-    if default_config.is_none() {
-        gen_default_config()?;
-        return Ok(());
-    }
-    config::save_config(RECOGNITION_CONFIG, config)
-}
-
-#[derive(Debug)]
-pub struct VoiceRecognitionConfigManager {
-    config: VoiceRecognitionConfig,
-}
-
-impl VoiceRecognitionConfigManager {
-    pub fn init() -> Self {
-        let config = load_voice_recognition_config();
-        match config {
-            Ok(data) => VoiceRecognitionConfigManager { config: data },
-            Err(err) => {
-                log::error!("Failed to init voice recognition config manager, load config with error: {}", err);
-                panic!("Unable to init voice recognition config manager");
-            }
-        }
-    }
-
-    pub fn get_config(&self) -> VoiceRecognitionConfig {
-        self.config.clone()
-    }
-
-    pub fn save_config(&mut self, config: VoiceRecognitionConfig) -> bool {
-        let result = save_voice_recognition_config(&config);
-        match result {
-            Ok(_) => {
-                self.config = config;
-                true
-            }
-            Err(err) => {
-                log::error!("Failed to save voice recognition config, err: {}", err);
-                false
-            }
-        }
     }
 }

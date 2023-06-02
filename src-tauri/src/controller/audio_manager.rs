@@ -1,4 +1,3 @@
-use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -9,13 +8,14 @@ use lazy_static::lazy_static;
 use rodio::{OutputStream, Sink};
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::RwLock as AsyncRwLock;
 
 use crate::common::{app, constants};
+use crate::config::audio;
+use crate::config::audio::{AudioSelection, AudioSelectionConfig, AudioStreamConfig, SelectByName, SelectDefault};
 use crate::controller::errors::{CommonError, ProgramError};
+use crate::utils;
 
 lazy_static! {
-    static ref AUDIO_MANGER: Arc<AsyncRwLock<AudioManager>> = Arc::new(AsyncRwLock::new(AudioManager::new()));
     static ref MIC_STREAM: Arc<Mutex<MicStreamWrapper>> = Arc::new(Mutex::new(MicStreamWrapper::new()));
     static ref MIC_STREAM_STOP: (Sender<()>, Receiver<()>) = broadcast::channel(1);
     static ref MIC_STREAM_STOP_ACCEPT: (Sender<()>, Receiver<()>) = broadcast::channel(1);
@@ -43,97 +43,9 @@ impl MicStreamWrapper {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SelectByName {
-    name: String,
-}
-
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SelectDefault {}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(tag = "type")]
-pub enum AudioSelection {
-    Default(SelectDefault),
-    ByName(SelectByName),
-}
-
-impl Default for AudioSelection {
-    fn default() -> Self {
-        AudioSelection::Default(SelectDefault::default())
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AudioSelectionConfig {
-    output: AudioSelection,
-    input: AudioSelection,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct StreamConfig {
-    stream_input: bool,
-    stream_mic_input: bool,
-}
-
-#[derive(Debug, Clone)]
-struct AudioManager {
-    config: AudioSelectionConfig,
-    stream: StreamConfig,
-}
-
-impl AudioManager {
-    fn new() -> Self {
-        AudioManager {
-            config: AudioSelectionConfig {
-                output: AudioSelection::default(),
-                input: AudioSelection::default(),
-            },
-            stream: StreamConfig {
-                stream_input: false,
-                stream_mic_input: false,
-            },
-        }
-    }
-
-    fn change_output_device_to_default(&mut self) {
-        self.config.output = AudioSelection::Default(SelectDefault {});
-    }
-
-    fn change_output_device_by_name(&mut self, new_device: String) {
-        self.config.output = AudioSelection::ByName(SelectByName {
-            name: new_device
-        });
-    }
-
-    fn get_output_device_name(&self) -> Option<String> {
-        let AudioSelection::ByName(SelectByName { name }) = self.to_owned().config.output else {
-            return None;
-        };
-        Some(name.clone())
-    }
-
-    fn change_input_device_to_default(&mut self) {
-        self.config.input = AudioSelection::Default(SelectDefault {});
-    }
-
-    fn change_input_device_by_name(&mut self, new_device: String) {
-        self.config.input = AudioSelection::ByName(SelectByName {
-            name: new_device
-        });
-    }
-
-    fn get_input_device_name(&self) -> Option<String> {
-        let AudioSelection::ByName(SelectByName { name }) = self.to_owned().config.input else {
-            return None;
-        };
-        Some(name.clone())
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AudioConfigResponseData {
     config: AudioSelectionConfig,
-    stream: StreamConfig,
+    stream: AudioStreamConfig,
     default_output_device: String,
     output_devices: Vec<String>,
     default_input_device: String,
@@ -174,13 +86,24 @@ fn available_input_devices() -> Result<Vec<String>, ProgramError> {
     Ok(result)
 }
 
-fn get_audio_config_from_manager(manager: &AudioManager) -> Result<AudioConfigResponseData, ProgramError> {
-    let config = manager.config.clone();
+async fn get_audio_sel_config() -> AudioSelectionConfig {
+    let manager = audio::AUDIO_SEL_CONFIG_MANAGER
+        .read().await;
+    manager.get_config()
+}
+
+async fn get_audio_stream_config() -> AudioStreamConfig {
+    let manager = audio::AUDIO_STREAM_CONFIG_MANAGER
+        .read().await;
+    manager.get_config()
+}
+
+pub async fn get_audio_config() -> Result<AudioConfigResponseData, ProgramError> {
     let outputs = available_output_devices()?;
     let inputs = available_input_devices()?;
     Ok(AudioConfigResponseData {
-        config,
-        stream: manager.stream.clone(),
+        config: get_audio_sel_config().await,
+        stream: get_audio_stream_config().await,
         default_output_device: default_output_device()?,
         output_devices: outputs,
         default_input_device: default_input_device()?,
@@ -188,10 +111,58 @@ fn get_audio_config_from_manager(manager: &AudioManager) -> Result<AudioConfigRe
     })
 }
 
-pub async fn get_audio_config() -> Result<AudioConfigResponseData, ProgramError> {
-    let lock = AUDIO_MANGER.clone();
-    let manager = lock.read().await;
-    get_audio_config_from_manager(manager.deref())
+async fn save_audio_sel_config(config: AudioSelectionConfig) -> Result<(), ProgramError> {
+    let mut manager = audio::AUDIO_SEL_CONFIG_MANAGER
+        .write().await;
+    if manager.save_config(config) {
+        Ok(())
+    } else {
+        Err(ProgramError::from("Failed to change input device to default"))
+    }
+}
+
+async fn change_input_device_to_default() -> Result<(), ProgramError> {
+    let mut config = get_audio_sel_config().await;
+    config.input = AudioSelection::Default(SelectDefault {});
+    save_audio_sel_config(config).await
+}
+
+async fn change_input_device_by_name(new_device: String) -> Result<(), ProgramError> {
+    let mut config = get_audio_sel_config().await;
+    config.input = AudioSelection::ByName(SelectByName {
+        name: new_device
+    });
+    save_audio_sel_config(config).await
+}
+
+async fn change_output_device_to_default() -> Result<(), ProgramError> {
+    let mut config = get_audio_sel_config().await;
+    config.output = AudioSelection::Default(SelectDefault {});
+    save_audio_sel_config(config).await
+}
+
+async fn change_output_device_by_name(new_device: String) -> Result<(), ProgramError> {
+    let mut config = get_audio_sel_config().await;
+    config.output = AudioSelection::ByName(SelectByName {
+        name: new_device
+    });
+    save_audio_sel_config(config).await
+}
+
+async fn get_input_device_name() -> Option<String> {
+    let config = get_audio_sel_config().await;
+    let AudioSelection::ByName(SelectByName { name }) = config.input else {
+        return None;
+    };
+    Some(name.clone())
+}
+
+async fn get_output_device_name() -> Option<String> {
+    let config = get_audio_sel_config().await;
+    let AudioSelection::ByName(SelectByName { name }) = config.output else {
+        return None;
+    };
+    Some(name.clone())
 }
 
 pub async fn start_mic_streaming() -> Result<(), ProgramError> {
@@ -217,16 +188,15 @@ pub async fn start_mic_streaming() -> Result<(), ProgramError> {
         let sample_rate = input_config.sample_rate().0;
         let channel = input_config.channels();
 
-        let input_stream = input_device.build_input_stream(
-            &input_config.into(),
-            move |data: &[f32], _: &_| {
+        let input_stream = utils::audio::build_input_stream(
+            &input_device,
+            &input_config,
+            move |data: Vec<f32>| {
                 let mic_stream_clone = MIC_STREAM.clone();
                 let mic_stream = mic_stream_clone.lock().unwrap();
                 let samples = rodio::buffer::SamplesBuffer::new(channel, sample_rate, data);
                 mic_stream.sink.as_ref().unwrap().append(samples);
-            },
-            |err| eprintln!("an error occurred on the input stream: {}", err),
-            None)?;
+            })?;
 
         log::debug!("Starting mic streaming");
         input_stream.play()?;
@@ -252,7 +222,6 @@ pub async fn start_mic_streaming() -> Result<(), ProgramError> {
     log::debug!("Mic streaming stop signal accepted");
 
     MIC_STREAMING.store(false, Ordering::Release);
-
 
     let mic_stream_clone = MIC_STREAM.clone();
     let mut mic_stream = mic_stream_clone.lock().unwrap();
@@ -292,7 +261,7 @@ pub async fn stop_mic_streaming() -> Result<(), ProgramError> {
     let (accept_tx, _) = &*MIC_STREAM_STOP_ACCEPT;
     let mut accept_rx = accept_tx.subscribe();
 
-    // wait for accept signal
+    // wait for signal
     _ = accept_rx.recv().await;
 
     Ok(())
@@ -302,9 +271,10 @@ pub async fn restart_mic_streaming() -> Result<(), ProgramError> {
     log::debug!("Try to restart mic streaming");
     stop_mic_streaming().await?;
 
-    let lock = AUDIO_MANGER.clone();
-    let manager = lock.read().await;
-    let is_streaming = manager.stream.stream_input && manager.stream.stream_mic_input;
+    let manager = audio::AUDIO_STREAM_CONFIG_MANAGER
+        .read().await;
+    let config = manager.get_config();
+    let is_streaming = config.stream_input && config.stream_mic_input;
     log::debug!("Restart is_streaming: {}", is_streaming);
     if is_streaming {
         start_mic_streaming_async();
@@ -324,12 +294,13 @@ fn start_mic_streaming_async() {
     });
 }
 
-pub async fn change_stream_config(stream: StreamConfig) -> Result<AudioConfigResponseData, ProgramError> {
+pub async fn change_stream_config(stream: AudioStreamConfig) -> Result<AudioConfigResponseData, ProgramError> {
     let is_streaming = {
-        let lock = AUDIO_MANGER.clone();
-        let mut manager = lock.write().await;
-        manager.stream = stream;
-        manager.stream.stream_input && manager.stream.stream_mic_input
+        let mut manager = audio::AUDIO_STREAM_CONFIG_MANAGER
+            .write().await;
+        let streaming = stream.stream_input && stream.stream_mic_input;
+        manager.save_config(stream);
+        streaming
     };
 
     log::debug!("is streaming: {}", is_streaming);
@@ -344,12 +315,10 @@ pub async fn change_stream_config(stream: StreamConfig) -> Result<AudioConfigRes
 }
 
 pub async fn change_output_device(selection: AudioSelection) -> Result<AudioConfigResponseData, ProgramError> {
-    let lock = AUDIO_MANGER.clone();
-    let mut manager = lock.write().await;
     match &selection {
         AudioSelection::Default(_) => {
-            manager.change_output_device_to_default();
-            return get_audio_config_from_manager(manager.deref());
+            change_output_device_to_default().await?;
+            return get_audio_config().await;
         }
         AudioSelection::ByName(SelectByName { name }) => {
             let host = cpal::default_host();
@@ -358,8 +327,8 @@ pub async fn change_output_device(selection: AudioSelection) -> Result<AudioConf
             for (_, device) in output_devices.enumerate() {
                 let device_name = device.name()?;
                 if device_name == *name {
-                    manager.change_output_device_by_name(device_name.clone());
-                    return get_audio_config_from_manager(manager.deref());
+                    change_output_device_by_name(device_name.clone()).await?;
+                    return get_audio_config().await;
                 }
             }
             Err(ProgramError::from(CommonError::new(format!("No such output device of name {}", name))))
@@ -368,12 +337,10 @@ pub async fn change_output_device(selection: AudioSelection) -> Result<AudioConf
 }
 
 pub async fn change_input_device(selection: AudioSelection) -> Result<AudioConfigResponseData, ProgramError> {
-    let lock = AUDIO_MANGER.clone();
-    let mut manager = lock.write().await;
     match &selection {
         AudioSelection::Default(_) => {
-            manager.change_input_device_to_default();
-            return get_audio_config_from_manager(manager.deref());
+            change_input_device_to_default().await?;
+            return get_audio_config().await;
         }
         AudioSelection::ByName(SelectByName { name }) => {
             let host = cpal::default_host();
@@ -382,8 +349,8 @@ pub async fn change_input_device(selection: AudioSelection) -> Result<AudioConfi
             for (_, device) in input_devices.enumerate() {
                 let device_name = device.name()?;
                 if device_name == *name {
-                    manager.change_input_device_by_name(device_name.clone());
-                    return get_audio_config_from_manager(manager.deref());
+                    change_input_device_by_name(device_name.clone()).await?;
+                    return get_audio_config().await;
                 }
             }
             Err(ProgramError::from(CommonError::new(format!("No such input device of name {}", name))))
@@ -392,9 +359,7 @@ pub async fn change_input_device(selection: AudioSelection) -> Result<AudioConfi
 }
 
 pub async fn get_output_device() -> Result<Device, ProgramError> {
-    let lock = AUDIO_MANGER.clone();
-    let audio_manager = lock.read().await;
-    let output = audio_manager.get_output_device_name();
+    let output = get_output_device_name().await;
     let host = cpal::default_host();
     if let Some(name) = output {
         let output_devices = host.output_devices()?;
@@ -412,9 +377,9 @@ pub async fn get_output_device() -> Result<Device, ProgramError> {
 }
 
 pub async fn is_stream_input_enabled() -> bool {
-    let lock = AUDIO_MANGER.clone();
-    let audio_manager = lock.read().await;
-    audio_manager.stream.stream_input
+    let manager = audio::AUDIO_STREAM_CONFIG_MANAGER
+        .read().await;
+    manager.get_config().stream_input
 }
 
 pub fn get_vb_audio_cable_output() -> Result<Device, ProgramError> {
@@ -432,9 +397,7 @@ pub fn get_vb_audio_cable_output() -> Result<Device, ProgramError> {
 }
 
 pub async fn get_input_device() -> Result<Device, ProgramError> {
-    let lock = AUDIO_MANGER.clone();
-    let audio_manager = lock.read().await;
-    let input = audio_manager.get_input_device_name();
+    let input = get_input_device_name().await;
     let host = cpal::default_host();
     if let Some(name) = input {
         let input_devices = host.input_devices()?;
@@ -466,8 +429,6 @@ fn is_vec_equals(vec1: &Vec<String>, vec2: &Vec<String>) -> bool {
 async fn check_audio_output_devices(previous: &Vec<String>,
                                     previous_default_output: String)
                                     -> Result<(bool, Option<(Vec<String>, String)>), ProgramError> {
-    let lock = AUDIO_MANGER.clone();
-    let mut audio_manager = lock.write().await;
     let outputs = available_output_devices();
     let default_output = default_output_device();
     if outputs.is_err() {
@@ -480,7 +441,7 @@ async fn check_audio_output_devices(previous: &Vec<String>,
     }
     let outputs = outputs.unwrap();
     let default_output = default_output.unwrap();
-    if let Some(name) = audio_manager.get_output_device_name() {
+    if let Some(name) = get_output_device_name().await {
         let mut exists = false;
         for device_name in &outputs {
             if *device_name == name {
@@ -491,7 +452,7 @@ async fn check_audio_output_devices(previous: &Vec<String>,
         if !exists {
             log::warn!("Current selected output device {} no longer exists, set to use default device", name.clone());
             // if selected device no longer exists, change to use default device
-            audio_manager.change_output_device_to_default();
+            change_output_device_to_default().await?;
             return Ok((true, Some((outputs, default_output))));
         }
     }
@@ -505,8 +466,6 @@ async fn check_audio_output_devices(previous: &Vec<String>,
 
 async fn check_audio_input_devices(previous: &Vec<String>,
                                    previous_default_input: String) -> Result<(bool, Option<(Vec<String>, String)>), ProgramError> {
-    let lock = AUDIO_MANGER.clone();
-    let mut audio_manager = lock.write().await;
     let inputs = available_input_devices();
     let default_input = default_input_device();
     if inputs.is_err() {
@@ -519,7 +478,7 @@ async fn check_audio_input_devices(previous: &Vec<String>,
     }
     let inputs = inputs.unwrap();
     let default_input = default_input.unwrap();
-    if let Some(name) = audio_manager.get_input_device_name() {
+    if let Some(name) = get_input_device_name().await {
         let mut exists = false;
         for device_name in &inputs {
             if *device_name == name {
@@ -530,7 +489,7 @@ async fn check_audio_input_devices(previous: &Vec<String>,
         if !exists {
             log::warn!("Current selected input device {} no longer exists, set to use default device", name.clone());
             // if selected device no longer exists, change to use default device
-            audio_manager.change_input_device_to_default();
+            change_input_device_to_default().await?;
             return Ok((true, Some((inputs, default_input))));
         }
     }

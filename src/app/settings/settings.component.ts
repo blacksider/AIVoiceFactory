@@ -1,7 +1,7 @@
 import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
 import {SettingsService} from './settings.service';
 import {ActivatedRoute} from '@angular/router';
-import {AudioConfigResponseData, AudioSelection, SelectByName, SelectDefault} from './settings';
+import {AudioConfigResponseData, AudioSelection, HttpProxyConfig, SelectByName, SelectDefault} from './settings';
 import {listen} from '@tauri-apps/api/event'
 
 @Component({
@@ -11,11 +11,14 @@ import {listen} from '@tauri-apps/api/event'
 })
 export class SettingsComponent implements OnInit, OnDestroy {
   audioConfig!: AudioConfigResponseData;
+  httpProxyConfig!: HttpProxyConfig;
 
   audioOutputs!: AudioSelection[];
   selectAudioOutput!: AudioSelection;
   audioInputs!: AudioSelection[];
   selectAudioInput!: AudioSelection;
+
+  httpAuthPwdVisible = false;
   private unListenChanges?: () => void;
 
   constructor(private service: SettingsService,
@@ -25,8 +28,9 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(
-      ({audioConfig}) => {
+      ({audioConfig, httpProxyConfig}) => {
         this.audioConfig = audioConfig as AudioConfigResponseData;
+        this.httpProxyConfig = httpProxyConfig as HttpProxyConfig;
         this.initAudioOutputs();
         this.initAudioInputs();
       });
@@ -117,5 +121,21 @@ export class SettingsComponent implements OnInit, OnDestroy {
         this.initAudioOutputs();
         this.initAudioInputs();
       });
+  }
+
+  onChangeHttpProxyConfig() {
+    console.log(this.httpProxyConfig);
+    this.service.saveHttpProxyConfig(this.httpProxyConfig)
+      .subscribe(() => {
+      });
+  }
+
+  onChangeHttpProxyAuthEnable() {
+    if (this.httpProxyConfig.enableAuth && !this.httpProxyConfig.authentication) {
+      this.httpProxyConfig.authentication = {
+        password: "", username: ""
+      };
+    }
+    this.onChangeHttpProxyConfig();
   }
 }

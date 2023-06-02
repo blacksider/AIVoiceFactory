@@ -64,4 +64,78 @@
       </nz-form-item>
     </div>
   </div>
+  <nz-divider nzPlain [nzText]="title_http_proxy" nzOrientation="left">
+    <ng-template #title_http_proxy><b>HTTP代理</b></ng-template>
+  </nz-divider>
+  <div nz-row nzGutter="10">
+    <div nz-col nzSpan="24">
+      <nz-form-item>
+        <nz-form-control>
+          <label nz-checkbox id="enableHttpProxy" name="enableHttpProxy"
+                 [(ngModel)]="httpProxyConfig.enable"
+                 (ngModelChange)="onChangeHttpProxyConfig()">
+            <div>启用代理</div>
+          </label>
+        </nz-form-control>
+      </nz-form-item>
+      <ng-container *ngIf="httpProxyConfig.enable">
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzFor="httpProxy_hostname">地址</nz-form-label>
+          <nz-form-control nzMd="12" nzXs="24">
+            <input id="httpProxy_hostname" name="httpProxy_hostname" nz-input
+                   [(ngModel)]="httpProxyConfig.hostname"
+                   (ngModelChange)="onChangeHttpProxyConfig()"/>
+          </nz-form-control>
+        </nz-form-item>
+        <nz-form-item>
+          <nz-form-label [nzSpan]="24" nzFor="httpProxy_port">端口</nz-form-label>
+          <nz-form-control nzSm="12" nzMd="6" nzXs="24">
+            <nz-input-number id="httpProxy_port" name="httpProxy_port"
+                             class="w-100"
+                             [(ngModel)]="httpProxyConfig.port"
+                             (ngModelChange)="onChangeHttpProxyConfig()">
+            </nz-input-number>
+          </nz-form-control>
+        </nz-form-item>
+        <nz-form-item>
+          <nz-form-control>
+            <label nz-checkbox id="enableHttpProxyAuth" name="enableHttpProxyAuth"
+                   [(ngModel)]="httpProxyConfig.enableAuth"
+                   (ngModelChange)="onChangeHttpProxyAuthEnable()">
+              <div>身份验证</div>
+            </label>
+          </nz-form-control>
+        </nz-form-item>
+        <ng-container *ngIf="httpProxyConfig.enableAuth && !!httpProxyConfig.authentication">
+          <nz-form-item>
+            <nz-form-label [nzSpan]="24" nzFor="httpProxy_username">用户名</nz-form-label>
+            <nz-form-control nzMd="12" nzXs="24">
+              <input id="httpProxy_username" name="httpProxy_username" nz-input
+                     [(ngModel)]="httpProxyConfig.authentication.username"
+                     (ngModelChange)="onChangeHttpProxyConfig()"/>
+            </nz-form-control>
+          </nz-form-item>
+          <nz-form-item>
+            <nz-form-label [nzSpan]="24" nzFor="httpProxy_pwd">密码</nz-form-label>
+            <nz-form-control nzMd="12" nzXs="24">
+              <nz-input-group [nzSuffix]="httpProxyPwdTpl">
+                <input id="httpProxy_pwd" name="httpProxy_pwd"
+                       [type]="httpAuthPwdVisible ? 'text' : 'password'"
+                       [(ngModel)]="httpProxyConfig.authentication.password"
+                       (ngModelChange)="onChangeHttpProxyConfig()"
+                       nz-input/>
+              </nz-input-group>
+              <ng-template #httpProxyPwdTpl>
+                <span
+                  nz-icon
+                  [nzType]="httpAuthPwdVisible ? 'eye-invisible' : 'eye'"
+                  (click)="httpAuthPwdVisible = !httpAuthPwdVisible">
+                </span>
+              </ng-template>
+            </nz-form-control>
+          </nz-form-item>
+        </ng-container>
+      </ng-container>
+    </div>
+  </div>
 </form>
