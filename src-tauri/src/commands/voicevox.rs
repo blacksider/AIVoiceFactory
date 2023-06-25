@@ -27,9 +27,7 @@ pub async fn stop_loading_voicevox_engine() {
 pub async fn available_voicevox_binaries() -> Option<Vec<String>> {
     let bins = voicevox::available_binaries();
     match bins {
-        Ok(bins) => {
-            Some(bins)
-        }
+        Ok(bins) => Some(bins),
         Err(err) => {
             log::error!("Failed to list voicevox available binaries, err: {}", err);
             None
@@ -40,9 +38,7 @@ pub async fn available_voicevox_binaries() -> Option<Vec<String>> {
 #[tauri::command]
 pub async fn get_voice_vox_speakers() -> Option<Vec<VoiceVoxSpeaker>> {
     let config = get_voice_vox_config().await;
-    if config.is_none() {
-        return None;
-    }
+    config.as_ref()?;
     let result = voicevox::speakers(&config.unwrap()).await;
     match result {
         Ok(res) => Some(res),
@@ -56,9 +52,7 @@ pub async fn get_voice_vox_speakers() -> Option<Vec<VoiceVoxSpeaker>> {
 #[tauri::command]
 pub async fn get_voice_vox_speaker_info(speaker_uuid: String) -> Option<VoiceVoxSpeakerInfo> {
     let config = get_voice_vox_config().await;
-    if config.is_none() {
-        return None;
-    }
+    config.as_ref()?;
     let result = voicevox::speaker_info(&config.unwrap(), speaker_uuid).await;
     match result {
         Ok(res) => Some(res),

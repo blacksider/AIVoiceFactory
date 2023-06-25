@@ -1,12 +1,13 @@
+use log::LevelFilter;
 use log4rs::{
     append::{
         console::{ConsoleAppender, Target},
         rolling_file::{
             policy::compound::{
-                CompoundPolicy,
                 roll::fixed_window::FixedWindowRoller,
                 // roll::delete::DeleteRoller,
                 trigger::size::SizeTrigger,
+                CompoundPolicy,
             },
             RollingFileAppender,
         },
@@ -15,7 +16,6 @@ use log4rs::{
     encode::pattern::PatternEncoder,
     filter::threshold::ThresholdFilter,
 };
-use log::LevelFilter;
 
 use crate::utils;
 
@@ -23,13 +23,12 @@ pub fn setup_logger() {
     // define log levels
     let global_log_level = LevelFilter::Debug;
     let stdout_log_level = LevelFilter::Debug;
-    let logfile_log_level;
-    if cfg!(debug_assertions) {
+    let logfile_log_level = if cfg!(debug_assertions) {
         // on dev mode, set file log to debug as well
-        logfile_log_level = LevelFilter::Debug;
+        LevelFilter::Debug
     } else {
-        logfile_log_level = LevelFilter::Info;
-    }
+        LevelFilter::Info
+    };
 
     // define log pattern
     let log_pattern = "{d(%Y-%m-%d %H:%M:%S)} | {({l}):5.5} | {f}:{L} — {m}{n}";
@@ -47,14 +46,16 @@ pub fn setup_logger() {
     let roller_base = 1;
     let roller = FixedWindowRoller::builder()
         .base(roller_base)
-        .build(roller_pattern, roller_count).unwrap();
+        .build(roller_pattern, roller_count)
+        .unwrap();
 
     // compound trigger and roller
-    let log_file_compound_policy = CompoundPolicy::new(Box::new(trigger),
-                                                       Box::new(roller));
+    let log_file_compound_policy = CompoundPolicy::new(Box::new(trigger), Box::new(roller));
 
     // define rolling file appender
-    let log_path = utils::get_app_home_dir().join("logs").join("ai_voice_factory.log");
+    let log_path = utils::get_app_home_dir()
+        .join("logs")
+        .join("ai_voice_factory.log");
     let log_file = RollingFileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(log_pattern)))
         .build(log_path, Box::new(log_file_compound_policy))
@@ -71,7 +72,8 @@ pub fn setup_logger() {
         .appender(
             Appender::builder()
                 .filter(Box::new(ThresholdFilter::new(logfile_log_level)))
-                .build("log_file", Box::new(log_file)))
+                .build("log_file", Box::new(log_file)),
+        )
         .appender(
             Appender::builder()
                 .filter(Box::new(ThresholdFilter::new(stdout_log_level)))
@@ -81,7 +83,8 @@ pub fn setup_logger() {
             Root::builder()
                 .appender("stdout")
                 .appender("log_file")
-                .build(global_log_level))
+                .build(global_log_level),
+        )
         .unwrap();
 
     let _log_handler = log4rs::init_config(config).unwrap();

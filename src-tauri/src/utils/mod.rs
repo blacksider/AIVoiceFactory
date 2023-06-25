@@ -1,9 +1,9 @@
 use std::env::current_dir;
 use std::path::PathBuf;
 
+pub mod audio;
 pub mod http;
 pub mod windows;
-pub mod audio;
 
 /// app home dir is current exe path
 pub fn get_app_home_dir() -> PathBuf {
@@ -11,13 +11,16 @@ pub fn get_app_home_dir() -> PathBuf {
         log::error!("Failed to get app home dir. error: {}", e);
         std::process::exit(-1);
     } else {
-        return current_dir().unwrap();
+        current_dir().unwrap()
     }
 }
 
 /// find the the first occurrence of specific file with given file name inside given directory
 pub fn find_file_in_dir(dir: PathBuf, file_name: &str) -> Option<PathBuf> {
-    for entry in walkdir::WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in walkdir::WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if entry.file_name() == file_name {
             return Some(entry.into_path());
         }
@@ -32,7 +35,11 @@ pub fn silent_remove_file(file: PathBuf) {
     match std::fs::remove_file(file.clone()) {
         Ok(_) => {}
         Err(err) => {
-            log::error!("Failed to remove file {}, err: {}", file.to_string_lossy().to_string(), err);
+            log::error!(
+                "Failed to remove file {}, err: {}",
+                file.to_string_lossy().to_string(),
+                err
+            );
         }
     }
 }
@@ -44,7 +51,11 @@ pub fn silent_remove_dir(dir: PathBuf) {
     match std::fs::remove_dir_all(dir.clone()) {
         Ok(_) => {}
         Err(err) => {
-            log::error!("Failed to remove dir {}, err: {}", dir.to_string_lossy().to_string(), err);
+            log::error!(
+                "Failed to remove dir {}, err: {}",
+                dir.to_string_lossy().to_string(),
+                err
+            );
         }
     }
 }

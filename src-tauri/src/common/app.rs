@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use lazy_static::lazy_static;
 use tauri::{AppHandle, Manager, Wry};
 
-use crate::controller::errors::ProgramError;
+use anyhow::{anyhow, Result};
 
 lazy_static! {
     static ref APP_HANDLE: Arc<Mutex<App>> = Arc::new(Mutex::new(App::new()));
@@ -20,7 +20,7 @@ unsafe impl Sync for App {}
 impl App {
     fn new() -> Self {
         App {
-            handle: Box::new(None)
+            handle: Box::new(None),
         }
     }
 
@@ -28,17 +28,15 @@ impl App {
         self.handle.replace(handle);
     }
 
-    fn get_handle(&self) -> Result<AppHandle<Wry>, ProgramError> {
+    fn get_handle(&self) -> Result<AppHandle<Wry>> {
         let handle = *self.handle.clone();
         if handle.is_none() {
-            return Err(ProgramError::from("app handle is empty"));
+            return Err(anyhow!("app handle is empty"));
         }
         Ok(handle.unwrap().app_handle())
     }
 
-    fn emit_all<S: serde::Serialize + Clone>(&self,
-                                             event: &str,
-                                             payload: S) -> Result<(), ProgramError> {
+    fn emit_all<S: serde::Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         self.get_handle()?.emit_all(event, payload)?;
         Ok(())
     }
@@ -50,14 +48,13 @@ pub fn set_app_handle(handle: AppHandle<Wry>) {
     lock.set_handle(handle);
 }
 
-pub fn get_app_handle() -> Result<AppHandle<Wry>, ProgramError> {
+pub fn get_app_handle() -> Result<AppHandle<Wry>> {
     let lock = APP_HANDLE.clone();
     let lock = lock.lock().unwrap();
     lock.get_handle()
 }
 
-pub fn silent_emit_all<S: serde::Serialize + Clone>(event: &str,
-                                                    payload: S) {
+pub fn silent_emit_all<S: serde::Serialize + Clone>(event: &str, payload: S) {
     let lock = APP_HANDLE.clone();
     let lock = lock.lock().unwrap();
     match lock.emit_all(event, payload) {

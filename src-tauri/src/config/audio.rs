@@ -6,12 +6,24 @@ use crate::gen_simple_config_manager;
 static AUDIO_SEL_CONFIG: &str = "audio_selection";
 static AUDIO_STREAM_CONFIG: &str = "audio_stream";
 
-gen_simple_config_manager!(AudioSelConfigManager, AudioSelectionConfig, AUDIO_SEL_CONFIG, gen_audio_sel_config);
-gen_simple_config_manager!(AudioStreamConfigManager, AudioStreamConfig, AUDIO_STREAM_CONFIG, gen_audio_stream_config);
+gen_simple_config_manager!(
+    AudioSelConfigManager,
+    AudioSelectionConfig,
+    AUDIO_SEL_CONFIG,
+    gen_audio_sel_config
+);
+gen_simple_config_manager!(
+    AudioStreamConfigManager,
+    AudioStreamConfig,
+    AUDIO_STREAM_CONFIG,
+    gen_audio_stream_config
+);
 
 lazy_static! {
-    pub static ref AUDIO_SEL_CONFIG_MANAGER: RwLock<AudioSelConfigManager> = RwLock::new(AudioSelConfigManager::init());
-    pub static ref AUDIO_STREAM_CONFIG_MANAGER: RwLock<AudioStreamConfigManager> = RwLock::new(AudioStreamConfigManager::init());
+    pub static ref AUDIO_SEL_CONFIG_MANAGER: RwLock<AudioSelConfigManager> =
+        RwLock::new(AudioSelConfigManager::init());
+    pub static ref AUDIO_STREAM_CONFIG_MANAGER: RwLock<AudioStreamConfigManager> =
+        RwLock::new(AudioStreamConfigManager::init());
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

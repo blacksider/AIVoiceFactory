@@ -34,6 +34,7 @@ name = "ai_voice_factory"
 version = "1.0.1"
 dependencies = [
  "aes",
+ "anyhow",
  "async-openai",
  "base64 0.21.0",
  "bincode",

@@ -5,13 +5,28 @@ use crate::gen_simple_config_manager;
 
 static RECOGNITION_CONFIG: &str = "voice_recognition";
 
-gen_simple_config_manager!(VoiceRecognitionConfigManager, VoiceRecognitionConfig, RECOGNITION_CONFIG, gen_default_config);
+gen_simple_config_manager!(
+    VoiceRecognitionConfigManager,
+    VoiceRecognitionConfig,
+    RECOGNITION_CONFIG,
+    gen_default_config
+);
 
 lazy_static! {
-    pub static ref VOICE_REC_CONFIG_MANAGER: RwLock<VoiceRecognitionConfigManager> = RwLock::new(VoiceRecognitionConfigManager::init());
+    pub static ref VOICE_REC_CONFIG_MANAGER: RwLock<VoiceRecognitionConfigManager> =
+        RwLock::new(VoiceRecognitionConfigManager::init());
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum WhisperConfigType {
     #[strum(serialize = "http")]
     Http,
@@ -31,7 +46,7 @@ pub struct RecognizeByWhisper {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum RecognitionTool {
-    Whisper(RecognizeByWhisper)
+    Whisper(RecognizeByWhisper),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -48,11 +63,9 @@ impl VoiceRecognitionConfig {
         if !self.enable {
             return (false, None);
         }
-        return match self.tool {
-            RecognitionTool::Whisper(config) => {
-                (true, Some(config))
-            }
-        };
+        match self.tool {
+            RecognitionTool::Whisper(config) => (true, Some(config)),
+        }
     }
 }
 
@@ -65,7 +78,7 @@ fn gen_default_config() -> VoiceRecognitionConfig {
         tool: RecognitionTool::Whisper(RecognizeByWhisper {
             config_type: WhisperConfigType::Http,
             use_model: "base".to_string(),
-            api_addr: empty_str.clone(),
+            api_addr: empty_str,
             language: None,
         }),
     }

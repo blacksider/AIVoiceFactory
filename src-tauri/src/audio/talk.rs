@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::sleep;
 use std::time::Duration;
 
+use anyhow::{anyhow, Error, Result};
 use cpal::traits::DeviceTrait;
 use lazy_static::lazy_static;
 use tauri::regex::Regex;
@@ -11,9 +12,8 @@ use tokio::sync::broadcast::{Receiver, Sender};
 use crate::audio::listener;
 use crate::common::{app, constants};
 use crate::config::voice_recognition;
-use crate::controller::{audio_manager, generator};
-use crate::controller::errors::ProgramError;
 use crate::controller::recognizer;
+use crate::controller::{audio_manager, generator};
 
 lazy_static! {
     static ref TALKING: AtomicBool = AtomicBool::new(false);
@@ -44,7 +44,7 @@ impl TalkParams {
     }
 }
 
-async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
+async fn start_talk_process(params: &TalkParams) -> Result<()> {
     let device = audio_manager::get_input_device().await?;
     let config = device.default_input_config()?;
     let sample_rate = config.sample_rate().0;
@@ -113,12 +113,12 @@ async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
                         // remove text between brackets []
                         {
                             let re = Regex::new(r"\[.*?\]").unwrap();
-                            text_heard = re.replace_all(&*text_heard, "").to_string();
+                            text_heard = re.replace_all(&text_heard, "").to_string();
                         }
                         // remove text between brackets ()
                         {
                             let re = Regex::new(r"\(.*?\)").unwrap();
-                            text_heard = re.replace_all(&*text_heard, "").to_string();
+                            text_heard = re.replace_all(&text_heard, "").to_string();
                         }
 
                         // take first line
@@ -172,7 +172,7 @@ async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
 
                         audio.clear();
                     }
-                    Ok::<_, ProgramError>(())
+                    Ok::<_, Error>(())
                 } => {
                     match response {
                         Ok(_) => {
@@ -202,9 +202,9 @@ async fn start_talk_process(params: &TalkParams) -> Result<(), ProgramError> {
     Ok(())
 }
 
-pub async fn start(params: &TalkParams) -> Result<(), ProgramError> {
+pub async fn start(params: &TalkParams) -> Result<()> {
     if TALKING.load(Ordering::Acquire) {
-        return Err(ProgramError::from("Talk process already running"));
+        return Err(anyhow!("Talk process already running"));
     }
 
     TALKING.store(true, Ordering::Release);
@@ -222,9 +222,9 @@ pub async fn start(params: &TalkParams) -> Result<(), ProgramError> {
     }
 }
 
-pub fn stop() -> Result<(), ProgramError> {
+pub fn stop() -> Result<()> {
     if !TALKING.load(Ordering::Acquire) {
-        return Err(ProgramError::from("Talk process already stopped"));
+        return Err(anyhow!("Talk process already stopped"));
     }
     let (interrupted_tx, _) = &*TALKING_STOP_SIG;
     match interrupted_tx.send(()) {

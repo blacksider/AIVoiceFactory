@@ -9,16 +9,22 @@ use crate::gen_simple_config_manager;
 static TRANSLATION_CONFIG: &str = "auto_translation";
 static SALT: &str = "1435660288";
 
-gen_simple_config_manager!(AutoTranslationConfigManager, AutoTranslationConfig, TRANSLATION_CONFIG, gen_default_config);
+gen_simple_config_manager!(
+    AutoTranslationConfigManager,
+    AutoTranslationConfig,
+    TRANSLATION_CONFIG,
+    gen_default_config
+);
 
 lazy_static! {
-   pub static ref AUTO_TRANS_CONFIG_MANAGER: Mutex<AutoTranslationConfigManager> = Mutex::new(AutoTranslationConfigManager::init());
+    pub static ref AUTO_TRANS_CONFIG_MANAGER: Mutex<AutoTranslationConfigManager> =
+        Mutex::new(AutoTranslationConfigManager::init());
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type")]
 enum AutoTranslateTool {
-    Baidu(TranslateByBaidu)
+    Baidu(TranslateByBaidu),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,7 +45,7 @@ pub struct AutoTranslationConfig {
 
 impl TranslateByBaidu {
     pub fn get_api(self) -> String {
-        self.api_addr.clone()
+        self.api_addr
     }
 
     pub fn build_params(self, text: &str) -> HashMap<&'static str, String> {
@@ -52,7 +58,7 @@ impl TranslateByBaidu {
         let sign = md5::compute(concat);
         let sign = format!("{:x}", sign);
 
-        params.insert("appid", self.app_id.to_owned());
+        params.insert("appid", self.app_id);
         params.insert("salt", SALT.to_owned());
         params.insert("sign", sign);
 
@@ -65,11 +71,9 @@ impl AutoTranslationConfig {
         if !self.enable {
             return (false, None);
         }
-        return match self.tool {
-            AutoTranslateTool::Baidu(config) => {
-                (true, Some(config))
-            }
-        };
+        match self.tool {
+            AutoTranslateTool::Baidu(config) => (true, Some(config)),
+        }
     }
 }
 
@@ -80,7 +84,7 @@ fn gen_default_config() -> AutoTranslationConfig {
         tool: AutoTranslateTool::Baidu(TranslateByBaidu {
             api_addr: empty_str.clone(),
             app_id: empty_str.clone(),
-            secret: empty_str.clone(),
+            secret: empty_str,
             from: "auto".to_string(),
             to: "jp".to_string(),
         }),
@@ -105,8 +109,9 @@ mod tests {
             }),
         };
         let json_value = serde_json::to_string(&config).unwrap();
-        let json_parsed = serde_json::from_str::<AutoTranslationConfig>(json_value.as_str()).unwrap();
-        assert_eq!(json_parsed.enable, true);
+        let json_parsed =
+            serde_json::from_str::<AutoTranslationConfig>(json_value.as_str()).unwrap();
+        assert!(json_parsed.enable);
         match json_parsed.tool {
             AutoTranslateTool::Baidu(config) => {
                 assert_eq!(config.api_addr, api_addr);

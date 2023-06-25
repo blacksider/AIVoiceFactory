@@ -1,18 +1,19 @@
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
-use cpal::{Device, Stream};
+use anyhow::{anyhow, Result};
 use cpal::traits::{DeviceTrait, StreamTrait};
+use cpal::{Device, Stream};
 use lazy_static::lazy_static;
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::controller::errors::ProgramError;
 use crate::utils;
 
 lazy_static! {
     static ref STREAM_AUDIO: Arc<Mutex<StreamAudio>> = Arc::new(Mutex::new(StreamAudio::new()));
     static ref RUNNING: AtomicBool = AtomicBool::new(false);
-    pub static ref LISTENER: Arc<AsyncMutex<Listener>> = Arc::new(AsyncMutex::new(Listener::new(30 * 1000)));
+    pub static ref LISTENER: Arc<AsyncMutex<Listener>> =
+        Arc::new(AsyncMutex::new(Listener::new(30 * 1000)));
 }
 
 pub struct StreamAudio {
@@ -59,10 +60,12 @@ impl StreamAudio {
             self.m_audio_pos = (self.m_audio_pos + n_samples) % self.m_audio.len();
             self.m_audio_len = self.m_audio.len();
         } else {
-            self.m_audio[self.m_audio_pos..self.m_audio_pos + n_samples].copy_from_slice(&self.m_audio_new);
+            self.m_audio[self.m_audio_pos..self.m_audio_pos + n_samples]
+                .copy_from_slice(&self.m_audio_new);
 
             self.m_audio_pos = (self.m_audio_pos + n_samples) % self.m_audio.len();
-            self.m_audio_len = self.m_audio_len + n_samples.min(self.m_audio.len() - self.m_audio_len);
+            self.m_audio_len =
+                self.m_audio_len + n_samples.min(self.m_audio.len() - self.m_audio_len);
         }
     }
 }
@@ -91,7 +94,7 @@ impl Listener {
         }
     }
 
-    pub fn init(&mut self, device: Device) -> Result<(), ProgramError> {
+    pub fn init(&mut self, device: Device) -> Result<()> {
         let config = device.default_input_config()?;
         let sample_rate = config.sample_rate().0;
         let m_audio_len = (sample_rate * self.m_len_ms) / 1000;
@@ -106,28 +109,27 @@ impl Listener {
         }
 
         RUNNING.store(false, Ordering::Release);
-        let stream = utils::audio::build_input_stream(
-            &device, &config, |data: Vec<f32>| {
-                if RUNNING.load(Ordering::SeqCst) {
-                    let lock = STREAM_AUDIO.clone();
-                    let mut stream_audio = lock.lock().unwrap();
-                    stream_audio.on_data(data);
-                }
-            })?;
+        let stream = utils::audio::build_input_stream(&device, &config, |data: Vec<f32>| {
+            if RUNNING.load(Ordering::SeqCst) {
+                let lock = STREAM_AUDIO.clone();
+                let mut stream_audio = lock.lock().unwrap();
+                stream_audio.on_data(data);
+            }
+        })?;
         self.stream = Some(stream);
         Ok(())
     }
 
-    pub fn resume(&self) -> Result<bool, ProgramError> {
+    pub fn resume(&self) -> Result<bool> {
         if RUNNING.load(Ordering::Acquire) {
             log::debug!("Listener already running");
             return Ok(false);
         }
 
-        self.stream.as_ref()
-            .ok_or("Failed to get stream reference")?
-            .play()
-            .map_err(|e| format!("Failed to play stream: {}", e))?;
+        self.stream
+            .as_ref()
+            .ok_or(anyhow!("Failed to get stream reference"))?
+            .play()?;
 
         RUNNING.store(true, Ordering::Release);
 
@@ -136,15 +138,15 @@ impl Listener {
         Ok(true)
     }
 
-    pub fn pause(&self) -> Result<bool, ProgramError> {
+    pub fn pause(&self) -> Result<bool> {
         if !RUNNING.load(Ordering::Acquire) {
             log::debug!("Listener already paused");
             return Ok(false);
         }
-        self.stream.as_ref()
-            .ok_or("Failed to get stream reference")?
-            .pause()
-            .map_err(|e| format!("Failed to pause stream: {}", e))?;
+        self.stream
+            .as_ref()
+            .ok_or(anyhow!("Failed to get stream reference"))?
+            .pause()?;
 
         RUNNING.store(false, Ordering::Release);
 
@@ -177,7 +179,7 @@ impl Listener {
         let lock = STREAM_AUDIO.clone();
         let stream_audio = lock.lock().unwrap();
 
-        let n_samples = if ms <= 0 {
+        let n_samples = if ms == 0 {
             self.m_len_ms * self.sample_rate / 1000
         } else {
             self.sample_rate * ms / 1000
@@ -228,7 +230,14 @@ fn high_pass_filter(data: &mut Vec<f32>, cutoff: f32, sample_rate: f32) {
     }
 }
 
-pub fn vad_simple(pcmf32: &mut Vec<f32>, sample_rate: u32, last_ms: u32, vad_thold: f32, freq_thold: f32, verbose: bool) -> bool {
+pub fn vad_simple(
+    pcmf32: &mut Vec<f32>,
+    sample_rate: u32,
+    last_ms: u32,
+    vad_thold: f32,
+    freq_thold: f32,
+    verbose: bool,
+) -> bool {
     let n_samples = pcmf32.len();
     let n_samples_last = ((sample_rate * last_ms) / 1000) as usize;
 
@@ -242,10 +251,21 @@ pub fn vad_simple(pcmf32: &mut Vec<f32>, sample_rate: u32, last_ms: u32, vad_tho
     }
 
     let energy_all = pcmf32.iter().map(|&x| x.abs()).sum::<f32>() / n_samples as f32;
-    let energy_last = pcmf32[n_samples - n_samples_last..].iter().map(|&x| x.abs()).sum::<f32>() / n_samples_last as f32;
+    let energy_last = pcmf32[n_samples - n_samples_last..]
+        .iter()
+        .map(|&x| x.abs())
+        .sum::<f32>()
+        / n_samples_last as f32;
 
     if verbose {
-        log::info!("{}: energy_all: {}, energy_last: {}, vad_thold: {}, freq_thold: {}", "vad_simple", energy_all, energy_last, vad_thold, freq_thold)
+        log::info!(
+            "{}: energy_all: {}, energy_last: {}, vad_thold: {}, freq_thold: {}",
+            "vad_simple",
+            energy_all,
+            energy_last,
+            vad_thold,
+            freq_thold
+        )
     }
 
     energy_last <= vad_thold * energy_all

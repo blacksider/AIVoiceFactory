@@ -1,25 +1,43 @@
+use anyhow::Result;
 use lazy_static::lazy_static;
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::config::config;
-use crate::controller::errors::ProgramError;
+use crate::config::config_manager;
 use crate::controller::voice_engine::voicevox;
 use crate::controller::voice_engine::voicevox::{check_and_load_binary, check_and_unload_binary};
 
 static VOICE_ENGINE_CONFIG: &str = "voice_engine";
 
 lazy_static! {
-  pub static ref VOICE_ENGINE_CONFIG_MANAGER: AsyncMutex<VoiceEngineConfigManager> =
-    AsyncMutex::new(VoiceEngineConfigManager::init());
+    pub static ref VOICE_ENGINE_CONFIG_MANAGER: AsyncMutex<VoiceEngineConfigManager> =
+        AsyncMutex::new(VoiceEngineConfigManager::init());
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum EngineType {
     #[strum(serialize = "VoiceVox")]
     VoiceVox,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum VoiceVoxConfigType {
     #[strum(serialize = "http")]
     Http,
@@ -51,9 +69,7 @@ impl VoiceVoxEngineConfig {
             VoiceVoxConfigType::Http => {
                 format!("{}://{}", self.protocol, self.api_addr)
             }
-            VoiceVoxConfigType::Binary => {
-                voicevox::build_engine_api().await
-            }
+            VoiceVoxConfigType::Binary => voicevox::build_engine_api().await,
         }
     }
 
@@ -65,7 +81,7 @@ impl VoiceVoxEngineConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "config")]
 enum EngineConfig {
-    VoiceVox(VoiceVoxEngineConfig)
+    VoiceVox(VoiceVoxEngineConfig),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -80,12 +96,10 @@ impl VoiceEngineConfig {
         self.engine_type == EngineType::VoiceVox
     }
 
-    pub fn get_voice_vox_config(&self) -> Result<VoiceVoxEngineConfig, ProgramError> {
-        return match self.clone().config {
-            EngineConfig::VoiceVox(config) => {
-                Ok(config)
-            }
-        };
+    pub fn get_voice_vox_config(&self) -> Result<VoiceVoxEngineConfig> {
+        match self.clone().config {
+            EngineConfig::VoiceVox(config) => Ok(config),
+        }
     }
 }
 
@@ -104,12 +118,11 @@ fn gen_default_config() -> VoiceEngineConfig {
     }
 }
 
-fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ProgramError> {
-    let old_config = config::load_config::<VoiceEngineConfig>(
-        VOICE_ENGINE_CONFIG,
-        gen_default_config)?;
+fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<()> {
+    let old_config =
+        config_manager::load_config::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG, gen_default_config)?;
 
-    config::save_config::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG, config)?;
+    config_manager::save_config::<VoiceEngineConfig>(VOICE_ENGINE_CONFIG, config)?;
 
     // unload condition is that current config is no longer voicevox binary config
     let unload_condition = {
@@ -133,8 +146,7 @@ fn save_voice_engine_config(config: &VoiceEngineConfig) -> Result<(), ProgramErr
             let pre = old_config.get_voice_vox_config()?;
             let now = config.get_voice_vox_config()?;
             if now.config_type == VoiceVoxConfigType::Binary {
-                pre.config_type != VoiceVoxConfigType::Binary ||
-                    pre.device != now.device
+                pre.config_type != VoiceVoxConfigType::Binary || pre.device != now.device
             } else {
                 false
             }
@@ -163,16 +175,17 @@ pub struct VoiceEngineConfigManager {
 
 impl VoiceEngineConfigManager {
     pub fn init() -> Self {
-        let config =
-            config::load_config::<VoiceEngineConfig>(
-                VOICE_ENGINE_CONFIG,
-                gen_default_config);
+        let config = config_manager::load_config::<VoiceEngineConfig>(
+            VOICE_ENGINE_CONFIG,
+            gen_default_config,
+        );
         match config {
-            Ok(data) => {
-                VoiceEngineConfigManager { config: data }
-            }
+            Ok(data) => VoiceEngineConfigManager { config: data },
             Err(err) => {
-                log::error!("Failed to init voice engine config manager, load config with error: {}", err);
+                log::error!(
+                    "Failed to init voice engine config manager, load config with error: {}",
+                    err
+                );
                 panic!("Unable to init voice engine config manager");
             }
         }

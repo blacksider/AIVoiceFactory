@@ -11,8 +11,7 @@ pub async fn translate(text: String) -> Option<String> {
     }
     if let Some(baidu_config) = by_baidu {
         log::info!("Translate by baidu, text: {}", text.clone());
-        let result = baidu_translation::translate(&baidu_config, text)
-            .await;
+        let result = baidu_translation::translate(&baidu_config, text).await;
         match result {
             Ok(translated) => {
                 return Some(translated);

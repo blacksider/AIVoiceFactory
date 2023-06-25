@@ -5,10 +5,16 @@ use crate::gen_simple_config_manager;
 
 static HTTP_PROXY_CONFIG: &str = "http_proxy";
 
-gen_simple_config_manager!(HttpProxyConfigManager, HttpProxyConfig, HTTP_PROXY_CONFIG, gen_default_config);
+gen_simple_config_manager!(
+    HttpProxyConfigManager,
+    HttpProxyConfig,
+    HTTP_PROXY_CONFIG,
+    gen_default_config
+);
 
 lazy_static! {
-    pub static ref HTTP_PROXY_CONFIG_MANAGER: RwLock<HttpProxyConfigManager> = RwLock::new(HttpProxyConfigManager::init());
+    pub static ref HTTP_PROXY_CONFIG_MANAGER: RwLock<HttpProxyConfigManager> =
+        RwLock::new(HttpProxyConfigManager::init());
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

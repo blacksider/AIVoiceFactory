@@ -2,20 +2,20 @@
 #![allow(dead_code)]
 #![allow(non_upper_case_globals)]
 
+use anyhow::{anyhow, Error, Result};
 use std::ffi::{CStr, CString};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use tauri::regex;
 use tauri::regex::Regex;
-use tokio::sync::{broadcast, Mutex};
 use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{broadcast, Mutex};
 
 use crate::config::voice_recognition;
 use crate::config::voice_recognition::WhisperConfigType;
-use crate::controller::errors::ProgramError;
 use crate::utils;
 use crate::utils::http;
 
@@ -26,7 +26,8 @@ const DLL_FILE: &str = "whisper/whisper.dll";
 const DLL_DOWNLOAD_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
 
 lazy_static! {
-    static ref WHISPER_LIB: Arc<Mutex<WhisperLibrary>> = Arc::new(Mutex::new(WhisperLibrary::new()));
+    static ref WHISPER_LIB: Arc<Mutex<WhisperLibrary>> =
+        Arc::new(Mutex::new(WhisperLibrary::new()));
     static ref MODEL_LOAD_STOP_SIG: (Sender<()>, Receiver<()>) = broadcast::channel(1);
     static ref MODEL_AVAILABLE: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 }
@@ -151,112 +152,102 @@ unsafe impl Sync for WhisperLibrary {}
 impl WhisperLibrary {
     fn new() -> Self {
         let file = PathBuf::from(DLL_FILE);
-        let lib = unsafe {
-            libloading::Library::new(file).expect("Unable to load whisper.dll")
-        };
+        let lib = unsafe { libloading::Library::new(file).expect("Unable to load whisper.dll") };
         WhisperLibrary {
             inner: lib,
             context: None,
         }
     }
 
-    fn get_context(&self) -> Result<*mut whisper_context, ProgramError> {
-        Ok(self.context.ok_or("Context is not initialized")?.clone())
+    fn get_context(&self) -> Result<*mut whisper_context> {
+        self.context.ok_or(anyhow!("Context is not initialized"))
     }
 
-    fn whisper_init_from_file(&mut self, file: String) -> Result<(), ProgramError> {
+    fn whisper_init_from_file(&mut self, file: String) -> Result<()> {
         // if context exits, free it
         if self.context.is_some() {
             self.whisper_free()?;
         }
-        let init_from_file: libloading::Symbol<unsafe extern "C" fn(*const std::os::raw::c_char) -> *mut whisper_context> = unsafe {
-            self.inner.get(b"whisper_init_from_file\0")?
-        };
-        let model_ptr = CString::new(file.as_bytes())
-            .map_err(|_| {
-                ProgramError::from("unable to convert String to CString")
-            })?;
-        let context = unsafe {
-            init_from_file(model_ptr.as_ptr())
-        };
+        let init_from_file: libloading::Symbol<
+            unsafe extern "C" fn(*const std::os::raw::c_char) -> *mut whisper_context,
+        > = unsafe { self.inner.get(b"whisper_init_from_file\0")? };
+        let model_ptr = CString::new(file.as_bytes())?;
+        let context = unsafe { init_from_file(model_ptr.as_ptr()) };
         self.context.replace(context);
         MODEL_AVAILABLE.store(true, Ordering::Release);
         drop(model_ptr);
         Ok(())
     }
 
-    fn whisper_full_default_params(&self) -> Result<whisper_full_params, ProgramError> {
-        let full_default_params: libloading::Symbol<unsafe extern "C" fn(whisper_sampling_strategy) -> whisper_full_params> = unsafe {
-            self.inner.get(b"whisper_full_default_params\0")?
-        };
-        let params = unsafe {
-            full_default_params(whisper_sampling_strategy_WHISPER_SAMPLING_GREEDY)
-        };
+    fn whisper_full_default_params(&self) -> Result<whisper_full_params> {
+        let full_default_params: libloading::Symbol<
+            unsafe extern "C" fn(whisper_sampling_strategy) -> whisper_full_params,
+        > = unsafe { self.inner.get(b"whisper_full_default_params\0")? };
+        let params =
+            unsafe { full_default_params(whisper_sampling_strategy_WHISPER_SAMPLING_GREEDY) };
         Ok(params)
     }
 
-    fn whisper_full(&self, wav: &Vec<f32>,
-                    params: whisper_full_params) -> Result<std::os::raw::c_int, ProgramError> {
-        let whisper_full: libloading::Symbol<unsafe extern "C" fn(
-            *mut whisper_context,
-            whisper_full_params,
-            *const f32,
-            std::os::raw::c_int,
-        ) -> std::os::raw::c_int> = unsafe {
-            self.inner.get(b"whisper_full\0")?
-        };
+    fn whisper_full(
+        &self,
+        wav: &Vec<f32>,
+        params: whisper_full_params,
+    ) -> Result<std::os::raw::c_int> {
+        let whisper_full: libloading::Symbol<
+            unsafe extern "C" fn(
+                *mut whisper_context,
+                whisper_full_params,
+                *const f32,
+                std::os::raw::c_int,
+            ) -> std::os::raw::c_int,
+        > = unsafe { self.inner.get(b"whisper_full\0")? };
 
         let result = unsafe {
-            whisper_full(self.get_context()?,
-                         params,
-                         wav.as_ptr(),
-                         wav.len() as std::os::raw::c_int)
+            whisper_full(
+                self.get_context()?,
+                params,
+                wav.as_ptr(),
+                wav.len() as std::os::raw::c_int,
+            )
         };
 
         Ok(result)
     }
 
-    fn whisper_full_n_segments(&self) -> Result<std::os::raw::c_int, ProgramError> {
-        let full_n_segments: libloading::Symbol<unsafe extern "C" fn(
-            *mut whisper_context
-        ) -> std::os::raw::c_int> = unsafe {
-            self.inner.get(b"whisper_full_n_segments\0").unwrap()
-        };
-        let n_segments = unsafe {
-            full_n_segments(self.get_context()?)
-        };
+    fn whisper_full_n_segments(&self) -> Result<std::os::raw::c_int> {
+        let full_n_segments: libloading::Symbol<
+            unsafe extern "C" fn(*mut whisper_context) -> std::os::raw::c_int,
+        > = unsafe { self.inner.get(b"whisper_full_n_segments\0").unwrap() };
+        let n_segments = unsafe { full_n_segments(self.get_context()?) };
         Ok(n_segments)
     }
 
-    fn whisper_full_get_segment_text(&self, seg: std::os::raw::c_int) -> Result<String, ProgramError> {
-        let full_get_segment_text: libloading::Symbol<unsafe extern "C" fn(
-            *mut whisper_context,
-            std::os::raw::c_int,
-        ) -> *const std::os::raw::c_char> = unsafe {
-            self.inner.get(b"whisper_full_get_segment_text\0").unwrap()
-        };
-        let text = unsafe {
-            full_get_segment_text(self.get_context()?, seg)
-        };
-        let text = unsafe {
-            CStr::from_ptr(text).to_string_lossy().to_string()
-        };
+    fn whisper_full_get_segment_text(&self, seg: std::os::raw::c_int) -> Result<String> {
+        let full_get_segment_text: libloading::Symbol<
+            unsafe extern "C" fn(
+                *mut whisper_context,
+                std::os::raw::c_int,
+            ) -> *const std::os::raw::c_char,
+        > = unsafe { self.inner.get(b"whisper_full_get_segment_text\0").unwrap() };
+        let text = unsafe { full_get_segment_text(self.get_context()?, seg) };
+        let text = unsafe { CStr::from_ptr(text).to_string_lossy().to_string() };
         Ok(text)
     }
 
-    fn whisper_free(&mut self) -> Result<(), ProgramError> {
+    fn whisper_free(&mut self) -> Result<()> {
         if self.context.is_none() {
             return Ok(());
         }
-        let free: libloading::Symbol<unsafe extern "C" fn(*mut whisper_context)> = unsafe {
-            self.inner.get(b"whisper_free\0").unwrap()
-        };
+        let free: libloading::Symbol<unsafe extern "C" fn(*mut whisper_context)> =
+            unsafe { self.inner.get(b"whisper_free\0").unwrap() };
         unsafe {
             free(self.get_context()?);
         }
         MODEL_AVAILABLE.store(false, Ordering::Release);
-        let context = self.context.take()
-            .ok_or("Cannot set context to none")?;
+        let context = self
+            .context
+            .take()
+            .ok_or(anyhow!("Cannot set context to none"))?;
         unsafe {
             std::ptr::drop_in_place(context);
         }
@@ -272,8 +263,7 @@ pub async fn init_library() {
     let _ = lock.lock().await;
 
     let config = {
-        let manager =
-            voice_recognition::VOICE_REC_CONFIG_MANAGER.read().await;
+        let manager = voice_recognition::VOICE_REC_CONFIG_MANAGER.read().await;
         manager.get_config()
     };
     if !config.enable {
@@ -289,7 +279,7 @@ pub async fn init_library() {
     }
 
     // spawn a new thread to load model
-    let model = config.use_model.clone();
+    let model = config.use_model;
     tauri::async_runtime::spawn(async move {
         match load_model(model.clone()).await {
             Ok(_) => {}
@@ -303,7 +293,7 @@ pub async fn init_library() {
 /// load whisper with given model name, note that model name pattern is "ggml-\[name].bin",
 /// the param is the part "\[name]",
 /// for example: to load model "ggml-base.bin", pass param: "base"
-pub async fn load_model(model: String) -> Result<(), ProgramError> {
+pub async fn load_model(model: String) -> Result<()> {
     log::debug!("Load whisper model: {}", model.clone());
     // lock download file by lib lock
     let lock = WHISPER_LIB.clone();
@@ -340,10 +330,10 @@ pub async fn load_model(model: String) -> Result<(), ProgramError> {
 
             // try to load model
             let model_file = model_file.to_str()
-                .ok_or(ProgramError::from("Unable to parse model file path to str"))?
+                .ok_or(anyhow!("cannot parse path to str"))?
                 .to_string();
             lib.whisper_init_from_file(model_file)?;
-            Ok::<_, ProgramError>(())
+            Ok::<_, Error>(())
         } => {
             response?;
             utils::silent_remove_file(download_tmp_file);
@@ -359,7 +349,7 @@ pub async fn load_model(model: String) -> Result<(), ProgramError> {
 }
 
 /// free whisper model
-pub async fn free_model() -> Result<(), ProgramError> {
+pub async fn free_model() -> Result<()> {
     let (interrupted_tx, _) = &*MODEL_LOAD_STOP_SIG;
     match interrupted_tx.send(()) {
         Ok(_) => {}
@@ -377,7 +367,7 @@ pub async fn free_model() -> Result<(), ProgramError> {
 }
 
 /// update whisper model if choosing another model
-pub async fn update_model(model: String) -> Result<(), ProgramError> {
+pub async fn update_model(model: String) -> Result<()> {
     free_model().await?;
 
     // spawn a new thread to load model
@@ -397,9 +387,9 @@ pub async fn update_model(model: String) -> Result<(), ProgramError> {
 /// all transcribe params are set by default optimized values,
 /// all you need to offer is language and audio data.<br>
 /// note data must be Vec\<f32>, mono channel, sample rate: 16000
-pub async fn recognize(language: Option<String>, data: &Vec<f32>) -> Result<String, ProgramError> {
+pub async fn recognize(language: Option<String>, data: &Vec<f32>) -> Result<String> {
     if !MODEL_AVAILABLE.load(Ordering::Acquire) {
-        return Err(ProgramError::from("Whisper model is not loaded"));
+        return Err(anyhow!("Whisper model is not loaded"));
     }
 
     let lock = WHISPER_LIB.clone();
@@ -415,11 +405,9 @@ pub async fn recognize(language: Option<String>, data: &Vec<f32>) -> Result<Stri
     wparams.translate = false;
 
     let lan: CString = if let Some(language) = language {
-        CString::new(language)
-            .map_err(|_| "unable to parse string to cstring")?
+        CString::new(language)?
     } else {
-        CString::new("".as_bytes())
-            .map_err(|_| "unable to parse string to cstring")?
+        CString::new("".as_bytes())?
     };
 
     wparams.language = lan.as_ptr();
@@ -436,18 +424,21 @@ pub async fn recognize(language: Option<String>, data: &Vec<f32>) -> Result<Stri
 
     let result = lib.whisper_full(data, wparams)?;
     if result != 0 {
-        return Err(ProgramError::from(format!("transcribe failed, code {}", result)));
+        return Err(anyhow!("transcribe failed, code {}", result));
     }
 
     let n_segments = lib.whisper_full_n_segments()?;
     let mut result = String::new();
     for i in 0..n_segments {
         let text = lib.whisper_full_get_segment_text(i)?;
-        result.push_str(&*text);
+        result.push_str(&text);
     }
 
-    if is_special_text(&*result) {
-        log::debug!("Whisper segment text is special text {}, skip", result.clone());
+    if is_special_text(&result) {
+        log::debug!(
+            "Whisper segment text is special text {}, skip",
+            result.clone()
+        );
         return Ok(String::new());
     }
 
@@ -462,14 +453,14 @@ fn is_special_text(text: &str) -> bool {
     let text_heard = String::from(text.trim());
     {
         let re = Regex::new(r"\(.*?\)").unwrap();
-        if re.is_match(&*text_heard) {
+        if re.is_match(&text_heard) {
             return true;
         }
     }
 
     {
         let re = Regex::new(r"\[.*?\]").unwrap();
-        if re.is_match(&*text_heard) {
+        if re.is_match(&text_heard) {
             return true;
         }
     }
@@ -478,7 +469,7 @@ fn is_special_text(text: &str) -> bool {
 }
 
 /// list all models in [MODEL_PATH] that is end with .bin(which is a file suffix of whisper model)
-pub fn available_models() -> Result<Vec<String>, ProgramError> {
+pub fn available_models() -> Result<Vec<String>> {
     let model_path = PathBuf::from(MODEL_PATH);
     let mut models = vec![];
 
@@ -487,13 +478,14 @@ pub fn available_models() -> Result<Vec<String>, ProgramError> {
     for entry in walkdir::WalkDir::new(model_path)
         .max_depth(1)
         .into_iter()
-        .filter_map(|e| e.ok()) {
+        .filter_map(|e| e.ok())
+    {
         if !entry.file_type().is_file() {
             continue;
         }
         let file_name = entry.file_name().to_str();
         if file_name.is_some() {
-            let file_name = file_name.unwrap();
+            let file_name = file_name.ok_or(anyhow!("cannot parse entry file name"))?;
             if let Some(captures) = file_name_p.captures(file_name) {
                 let name = &captures[1];
                 models.push(name.to_string());

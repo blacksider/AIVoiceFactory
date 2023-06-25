@@ -3,23 +3,26 @@
 
 extern crate core;
 
-use tauri::{App, AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, Window, Wry};
+use anyhow::{anyhow, Result};
+use tauri::{
+    App, AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu,
+    SystemTrayMenuItem, Window, Wry,
+};
 
 use crate::common::{app, constants};
 use crate::config::voice_engine;
-use crate::controller::{audio_manager, audio_recorder, generator};
-use crate::controller::errors::ProgramError;
 use crate::controller::voice_engine::voicevox;
 use crate::controller::voice_recognition::whisper;
+use crate::controller::{audio_manager, audio_recorder, generator};
 
-mod logger;
-mod cypher;
-mod config;
-mod commands;
-mod controller;
-mod utils;
-mod common;
 mod audio;
+mod commands;
+mod common;
+mod config;
+mod controller;
+mod cypher;
+mod logger;
+mod utils;
 
 fn create_system_tray() -> SystemTray {
     let quit = CustomMenuItem::new("exit".to_string(), "Exit");
@@ -31,12 +34,12 @@ fn create_system_tray() -> SystemTray {
     SystemTray::new().with_menu(tray_menu)
 }
 
-pub fn get_main_window(app: &AppHandle<Wry>) -> Result<Window<Wry>, ProgramError> {
+pub fn get_main_window(app: &AppHandle<Wry>) -> Result<Window<Wry>> {
     app.get_window("main")
-        .ok_or(ProgramError::from("cannot get main window"))
+        .ok_or(anyhow!("cannot get main window"))
 }
 
-pub fn handle_dbl_click(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
+pub fn handle_dbl_click(app: &AppHandle<Wry>) -> Result<()> {
     let window = get_main_window(app)?;
     window.unminimize()?;
     window.show()?;
@@ -44,22 +47,24 @@ pub fn handle_dbl_click(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
     Ok(())
 }
 
-pub fn handle_close(app: &AppHandle<Wry>) -> Result<(), ProgramError> {
+pub fn handle_close(app: &AppHandle<Wry>) -> Result<()> {
     get_main_window(app)?.hide()?;
-    app::silent_emit_all(constants::event::WINDOW_CLOSE, {});
+    app::silent_emit_all(constants::event::WINDOW_CLOSE, ());
     Ok(())
 }
 
 pub fn handle_system_tray_event(app: &AppHandle<Wry>, event: SystemTrayEvent) {
     match event {
-        SystemTrayEvent::DoubleClick { position: _, size: _, .. } => {
-            match handle_dbl_click(app) {
-                Ok(_) => {}
-                Err(err) => {
-                    log::error!("Failed to handle dbl click event, err: {}", err);
-                }
+        SystemTrayEvent::DoubleClick {
+            position: _,
+            size: _,
+            ..
+        } => match handle_dbl_click(app) {
+            Ok(_) => {}
+            Err(err) => {
+                log::error!("Failed to handle dbl click event, err: {}", err);
             }
-        }
+        },
         SystemTrayEvent::MenuItemClick { id, .. } => {
             match id.as_str() {
                 "exit" => {
@@ -85,17 +90,22 @@ pub fn handle_system_tray_event(app: &AppHandle<Wry>, event: SystemTrayEvent) {
     }
 }
 
-pub fn setup(app: &mut App<Wry>) -> Result<(), ProgramError> {
+pub fn setup(app: &mut App<Wry>) -> Result<()> {
     let window = get_main_window(&app.app_handle())?;
     // if at dev mode, set window to the right side of current monitor
     if cfg!(debug_assertions) {
         log::debug!("Running at dev mode, move window to right side of the screen");
         let window_width = window.outer_size()?.width;
-        let screen = window.current_monitor()?.ok_or("Monitor info not found")?;
+        let screen = window
+            .current_monitor()?
+            .ok_or(anyhow!("Monitor info not found"))?;
         let screen_width = screen.size().width;
         let window_x = screen_width - window_width;
         let window_y = 100;
-        window.set_position(tauri::PhysicalPosition { x: window_x, y: window_y })?;
+        window.set_position(tauri::PhysicalPosition {
+            x: window_x,
+            y: window_y,
+        })?;
     }
 
     tauri::async_runtime::spawn(async {
@@ -147,7 +157,6 @@ fn main() {
             commands::configs::change_stream_config,
             commands::configs::get_http_proxy_config,
             commands::configs::save_http_proxy_config,
-
             commands::voicevox::is_voicevox_engine_initialized,
             commands::voicevox::is_loading_voicevox_engine,
             commands::voicevox::check_voicevox_engine,
@@ -155,24 +164,21 @@ fn main() {
             commands::voicevox::get_voice_vox_speakers,
             commands::voicevox::get_voice_vox_speaker_info,
             commands::voicevox::available_voicevox_binaries,
-
             commands::audios::list_audios,
             commands::audios::get_audio_detail,
             commands::audios::delete_audio,
             commands::audios::play_audio,
             commands::audios::generate_audio,
             commands::audios::is_recorder_recording,
-
             commands::whisper::whisper_available_models,
         ])
         .system_tray(create_system_tray())
         .on_system_tray_event(handle_system_tray_event)
-        .on_window_event(|event| match event.event() {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
                 event.window().hide().unwrap();
                 api.prevent_close();
             }
-            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
