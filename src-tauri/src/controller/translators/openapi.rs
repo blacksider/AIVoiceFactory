@@ -4,14 +4,16 @@ use async_openai::{types::CreateCompletionRequestArgs, Client};
 
 /// TODO do next by openai
 async fn call() -> Result<(), Box<dyn Error>> {
-    let proxy_url = format!("http://{}:{}", "127.0.0.1", "7890");
+    // TODO read from env
+    let proxy_url = format!("http://{}:{}", "proxy_host", "proxy_port");
     let proxy = reqwest::Proxy::all(&proxy_url)?;
 
     let client = reqwest::Client::builder().proxy(proxy).build()?;
 
     let client = Client::new()
         .with_http_client(client)
-        .with_api_key("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");
+        // TODO read from env
+        .with_api_key("TODO-READ-FROM-ENV");
 
     let request = CreateCompletionRequestArgs::default()
         .model("text-davinci-003")
